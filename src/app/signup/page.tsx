@@ -18,17 +18,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { UserPlus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const signupFormSchema = z.object({
-  name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
+  name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }).optional(),
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
-  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }), // Simple validation for prototype
+  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
 });
 
 type SignupFormValues = z.infer<typeof signupFormSchema>;
 
 export default function SignupPage() {
-  const { signup } = useAuth();
+  const { signup, isLoading } = useAuth();
+  const { toast } = useToast();
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupFormSchema),
@@ -39,9 +41,14 @@ export default function SignupPage() {
     },
   });
 
-  function onSubmit(data: SignupFormValues) {
-    // In a real app, password would be hashed and sent securely
-    signup(data.email, data.name);
+  async function onSubmit(data: SignupFormValues) {
+    try {
+      await signup(data.email, data.password, data.name);
+      // Navigation is handled within the signup function of AuthContext on success
+    } catch (error: any) {
+      // Error handling is done within AuthContext
+      console.error("Signup page submit error:", error);
+    }
   }
 
   return (
@@ -59,7 +66,7 @@ export default function SignupPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nombre Completo</FormLabel>
+                    <FormLabel>Nombre Completo (Opcional)</FormLabel>
                     <FormControl>
                       <Input placeholder="Tu Nombre" {...field} />
                     </FormControl>
@@ -93,8 +100,8 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full text-lg py-3 bg-accent hover:bg-accent/90 text-accent-foreground" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Creando cuenta...' : 'Registrarse'}
+              <Button type="submit" className="w-full text-lg py-3 bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isLoading || form.formState.isSubmitting}>
+                {isLoading || form.formState.isSubmitting ? 'Creando cuenta...' : 'Registrarse'}
               </Button>
             </form>
           </Form>

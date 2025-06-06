@@ -28,8 +28,11 @@ export interface PaymentDetails {
   cvv: string;
 }
 
+// Updated User type to align better with Firebase User
 export interface User {
-  id: string;
-  name?: string;
-  email: string;
+  uid: string;         // Firebase User ID
+  email: string | null; // Firebase User email
+  displayName?: string | null; // Firebase User display name
+  // You can add other Firebase user properties if needed, e.g., photoURL
 }
+

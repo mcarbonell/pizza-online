@@ -18,16 +18,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { LogIn } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
-  password: z.string().min(1, { message: "La contraseña no puede estar vacía." }), // Simple validation for prototype
+  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, isLoading } = useAuth();
+  const { toast } = useToast();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -37,9 +39,15 @@ export default function LoginPage() {
     },
   });
 
-  function onSubmit(data: LoginFormValues) {
-    // In a real app, password would be sent securely and validated on backend
-    login(data.email); // Name can be fetched from backend after login
+  async function onSubmit(data: LoginFormValues) {
+    try {
+      await login(data.email, data.password);
+      // Navigation is handled within the login function of AuthContext on success
+    } catch (error: any) {
+      // Error handling is done within AuthContext, but you can add specific UI updates here if needed
+      // For example, form.setError for specific fields if backend provides that level of detail
+      console.error("Login page submit error:", error);
+    }
   }
 
   return (
@@ -78,8 +86,8 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full text-lg py-3" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Accediendo...' : 'Iniciar Sesión'}
+              <Button type="submit" className="w-full text-lg py-3" disabled={isLoading || form.formState.isSubmitting}>
+                {isLoading || form.formState.isSubmitting ? 'Accediendo...' : 'Iniciar Sesión'}
               </Button>
             </form>
           </Form>

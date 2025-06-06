@@ -22,18 +22,23 @@ export default function Header() {
   const { user, logout, isLoading } = useAuth();
   const totalItems = getTotalItems();
 
-  const getUserInitials = (name?: string, email?: string) => {
-    if (name) {
-      const names = name.split(' ');
+  const getUserInitials = (displayName?: string | null, email?: string | null) => {
+    if (displayName) {
+      const names = displayName.split(' ');
       if (names.length > 1) {
         return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
       }
-      return name.substring(0, 2).toUpperCase();
+      return displayName.substring(0, 2).toUpperCase();
     }
     if (email) {
       return email.substring(0, 2).toUpperCase();
     }
     return 'PZ';
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    // Navigation is handled within the logout function of AuthContext
   };
 
 
@@ -59,25 +64,28 @@ export default function Header() {
             )}
           </Button>
 
-          {!isLoading && (
-            user ? (
+          {isLoading ? (
+             <div className="h-10 w-24 bg-muted rounded animate-pulse"></div>
+           ) : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                     <Avatar className="h-9 w-9">
                       {/* Placeholder for user image - can be extended later */}
-                      {/* <AvatarImage src={user.imageUrl || ""} alt={user.name || user.email} /> */}
-                      <AvatarFallback>{getUserInitials(user.name, user.email)}</AvatarFallback>
+                      {/* <AvatarImage src={user.photoURL || ""} alt={user.displayName || user.email || ""} /> */}
+                      <AvatarFallback>{getUserInitials(user.displayName, user.email)}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user.name || 'Usuario'}</p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {user.email}
-                      </p>
+                      <p className="text-sm font-medium leading-none">{user.displayName || 'Usuario'}</p>
+                      {user.email && (
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {user.email}
+                        </p>
+                      )}
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -87,7 +95,7 @@ export default function Header() {
                       Perfil
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={logout}>
+                  <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Cerrar Sesión
                   </DropdownMenuItem>
@@ -108,11 +116,7 @@ export default function Header() {
                   </Link>
                 </Button>
               </div>
-            )
-          )}
-           {isLoading && (
-             <div className="h-10 w-24 bg-muted rounded animate-pulse"></div>
-           )}
+            )}
         </div>
       </div>
     </header>
