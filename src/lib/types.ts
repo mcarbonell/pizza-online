@@ -27,3 +27,9 @@ export interface PaymentDetails {
   expiryDate: string; // MM/YY
   cvv: string;
 }
+
+export interface User {
+  id: string;
+  name?: string;
+  email: string;
+}

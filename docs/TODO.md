@@ -1,15 +1,24 @@
+
 # Lista de Tareas Pendientes (TODO)
 
 Este documento rastrea las características y mejoras planificadas para PizzaPlace.
 
 ## Funcionalidades Principales
-- [ ] **Autenticación de Usuarios:**
-    - [ ] Registro de nuevos usuarios.
-    - [ ] Inicio de sesión para usuarios existentes.
-    - [ ] Cierre de sesión.
-    - [ ] Protección de rutas (ej. perfil de usuario, historial de pedidos).
+- [x] **Autenticación de Usuarios (Simulada - Fase 1):**
+    - [x] Crear `AuthContext` para estado de usuario (simulado).
+    - [x] Página de "Iniciar Sesión" (`/login`) con formulario básico.
+    - [x] Página de "Registrarse" (`/signup`) con formulario básico.
+    - [x] Página de "Perfil" (`/profile`) básica para usuario conectado.
+    - [x] Actualizar `Header` para mostrar enlaces condicionales (Login/Signup vs Profile/Logout).
+    - [x] Persistencia básica del estado de login en `localStorage`.
+- [ ] **Autenticación de Usuarios (Completa - Fase 2):**
+    - [ ] Integrar con un servicio de autenticación real (Firebase Auth o NextAuth.js).
+    - [ ] Manejo seguro de contraseñas (hashing).
+    - [ ] Verificación de correo electrónico.
+    - [ ] Opción de "Olvidé mi contraseña".
+    - [ ] Protección de rutas (ej. perfil de usuario, historial de pedidos) - redireccionar si no está autenticado.
 - [ ] **Historial de Pedidos:**
-    - [ ] Página para que los usuarios vean sus pedidos anteriores.
+    - [ ] Página para que los usuarios vean sus pedidos anteriores (requiere backend).
     - [ ] Detalles de cada pedido.
 - [ ] **Panel de Administración:**
     - [ ] CRUD para productos (Pizzas, Acompañamientos, Bebidas, Postres).
@@ -55,7 +64,7 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
 - [ ] **Notificaciones Push (opcional) para actualizaciones de pedidos.**
 
 ## Documentación
-- [ ] Mantener actualizada la documentación de arquitectura.
+- [x] Mantener actualizada la documentación de arquitectura.
 - [ ] Documentar componentes complejos.
 - [ ] Añadir guías para desarrolladores (cómo levantar el entorno, convenciones de código).
 
