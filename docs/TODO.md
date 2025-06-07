@@ -32,9 +32,9 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
 - [ ] **Verificación de Correo Electrónico (Firebase Auth):**
     - [ ] Enviar correo de verificación al registrarse.
     - [ ] Mostrar estado de verificación en el perfil y restringir ciertas acciones si no está verificado.
-- [ ] **Historial de Pedidos:**
-    - [x] Guardar pedidos en Firestore al completar el checkout (En Progreso)
-    - [ ] Página para que los usuarios vean sus pedidos anteriores (requiere backend o Firestore).
+- [x] **Historial de Pedidos:**
+    - [x] Guardar pedidos en Firestore al completar el checkout.
+    - [x] Página para que los usuarios vean sus pedidos anteriores (requiere backend o Firestore).
     - [ ] Detalles de cada pedido.
 - [ ] **Panel de Administración:**
     - [ ] CRUD para productos (Pizzas, Acompañamientos, Bebidas, Postres) - podría usar Firestore.

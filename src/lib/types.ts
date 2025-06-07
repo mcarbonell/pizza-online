@@ -38,12 +38,12 @@ export interface User {
 
 // New Order interface
 export interface Order {
-  id?: string; // Firestore document ID, will be auto-generated
+  id?: string; // Firestore document ID, will be auto-generated when creating, populated when fetching
   userId: string;
   items: CartItem[];
   totalAmount: number;
   shippingAddress: OrderDetails;
   paymentDetails: PaymentDetails; // Still simulated
-  createdAt: any; // Firestore Timestamp (will be serverTimestamp())
+  createdAt: any; // Firestore Timestamp (will be serverTimestamp() when creating, Timestamp when fetching)
   status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled'; // Example statuses
 }
