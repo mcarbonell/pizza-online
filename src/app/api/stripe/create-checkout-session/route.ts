@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     const line_items = items.map((item) => ({
       price_data: {
-        currency: 'usd', // Or your desired currency
+        currency: 'eur', // Changed currency to EUR
         product_data: {
           name: item.name,
           images: [item.imageUrl], // Stripe expects an array of image URLs
@@ -89,3 +89,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to create checkout session' }, { status: 500 });
   }
 }
+

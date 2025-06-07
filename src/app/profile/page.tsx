@@ -14,7 +14,7 @@ import { translateOrderStatus } from '@/lib/types';
 import Image from 'next/image';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogFooter  } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
@@ -239,8 +239,8 @@ export default function ProfilePage() {
     ); 
   }
 
-  return (
-    <div className="container mx-auto py-12 px-4 max-w-4xl">
+ return (
+
       <Card className="shadow-xl">
         <CardHeader className="text-center border-b pb-6">
           <UserCircle className="mx-auto h-24 w-24 text-primary mb-4" />
@@ -285,7 +285,7 @@ export default function ProfilePage() {
                               <AccordionContent> <ul className="space-y-3 pt-2"> {order.items.map((item) => ( <li key={item.id} className="flex items-center justify-between gap-3 p-2 rounded-md bg-muted/20"> <div className="flex items-center gap-3"> <Image src={item.imageUrl} alt={item.name} width={40} height={40} className="rounded object-cover" data-ai-hint={item.dataAiHint || ''}/> <div><p className="font-semibold text-sm">{item.name}</p><p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p></div> </div> <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p> </li> ))} </ul> </AccordionContent>
                             </AccordionItem>
                             <AccordionItem value="shipping"> <AccordionTrigger className="text-base font-semibold">Detalles de Envío</AccordionTrigger>
-                              <AccordionContent className="text-sm space-y-1 pt-2"> <p><strong>Nombre:</strong> {order.shippingAddress.name}</p> <p><strong>Email:</strong> {order.shippingAddress.email}</p> <p><strong>Dirección:</strong> {order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.postalCode}</p> {order.shippingAddress.phone && <p><strong>Teléfono:</strong> {order.shippingAddress.phone}</p>} </AccordionContent>
+                              <AccordionContent className="text-sm space-y-1 pt-2"> <p><strong>Nombre:</strong> {order.shippingAddress.name}</p> <p><strong>Email:</strong> {order.shippingAddress.email}</p> <p><strong>Dirección:</strong> {order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.postalCode}</p> {order.shippingAddress.phone && <p><strong><Phone className="inline h-4 w-4 mr-1"/>Teléfono:</strong> {order.shippingAddress.phone}</p>} </AccordionContent>
                             </AccordionItem>
                           </Accordion>
                         </CardContent>
@@ -313,8 +313,7 @@ export default function ProfilePage() {
             </TabsContent>
           </Tabs>
         </CardContent>
-        <CardFooter className="border-t pt-6"> <Button onClick={logout} variant="destructive" className="w-full" disabled={authIsLoading}> <LogOut /> {authIsLoading ? 'Cerrando sesión...' : 'Cerrar Sesión'} </Button> </Footer>
-      </Card>
-    </div>
+        <CardFooter className="border-t pt-6"> <Button onClick={logout} variant="destructive" className="w-full" disabled={authIsLoading}> <LogOut /> {authIsLoading ? 'Cerrando sesión...' : 'Cerrar Sesión'} </Button> </CardFooter>
+        </Card>
   );
 }
