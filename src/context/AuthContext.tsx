@@ -2,7 +2,7 @@
 "use client";
 
 import type { User, UserProfile, UpdateUserProfileFormValues, ShippingAddressDetails, SimulatedPaymentMethod } from '@/lib/types';
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, type ReactNode, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { auth, googleProvider, db } from '@/lib/firebase';
 import { 
@@ -115,7 +115,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const fetchUserProfile = async (uid: string) => {
+  const fetchUserProfile = useCallback(async (uid: string) => {
     setIsLoadingUserProfile(true);
     try {
       const userRef = doc(db, "users", uid);
@@ -133,7 +133,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoadingUserProfile(false);
     }
-  };
+  }, [toast, setIsLoadingUserProfile, setUserProfile]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -157,15 +157,12 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       setIsLoading(false); 
     });
     return () => unsubscribe();
-  }, []);
+  }, [fetchUserProfile]);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      if (userCredential.user) {
-        // onAuthStateChanged will handle setting user and fetching profile
-      }
+      await signInWithEmailAndPassword(auth, email, password);
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Inicio de sesión exitoso", description: "¡Bienvenido de nuevo!" });
@@ -175,9 +172,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router, searchParams, toast, setIsLoading]);
 
-  const signup = async (email: string, password: string, name?: string) => {
+  const signup = useCallback(async (email: string, password: string, name?: string) => {
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -187,7 +184,6 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
           }
           await sendEmailVerification(userCredential.user);
           toast({ title: "Verifica tu correo", description: "Se ha enviado un correo de verificación a tu dirección. Por favor, revisa tu bandeja de entrada." });
-          // Firestore document will be updated/created by onAuthStateChanged logic
       }
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
@@ -198,13 +194,12 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router, searchParams, toast, setIsLoading]);
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = useCallback(async () => {
     setIsLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      // onAuthStateChanged will handle setting user and fetching profile
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Inicio de sesión con Google exitoso", description: `¡Bienvenido, ${result.user.displayName || result.user.email}!` });
@@ -224,9 +219,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router, searchParams, toast, setIsLoading]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     setIsLoading(true);
     try {
       await signOut(auth);
@@ -240,9 +235,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router, toast, setIsLoading, setUser, setUserProfile]);
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = useCallback(async (email: string) => {
     setIsLoading(true);
     try {
       await sendPasswordResetEmail(auth, email);
@@ -261,9 +256,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router, toast, setIsLoading]);
 
-  const updateUserPassword = async (currentPassword: string, newPassword: string) => {
+  const updateUserPassword = useCallback(async (currentPassword: string, newPassword: string) => {
     setIsLoading(true);
     const firebaseUser = auth.currentUser;
     if (!firebaseUser || !firebaseUser.email) {
@@ -277,7 +272,8 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       await reauthenticateWithCredential(firebaseUser, credential);
       await firebaseUpdatePassword(firebaseUser, newPassword);
       toast({ title: "Contraseña actualizada", description: "Tu contraseña ha sido cambiada exitosamente." });
-    } catch (error: any) {
+    } catch (error: any)
+    {
       console.error("Error updating password:", error);
       let errorMessage = "No se pudo actualizar la contraseña.";
       if (error.code === 'auth/wrong-password') {
@@ -290,9 +286,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast, setIsLoading]);
 
-  const updateUserProfileDetails = async (data: UpdateUserProfileFormValues) => {
+  const updateUserProfileDetails = useCallback(async (data: UpdateUserProfileFormValues) => {
     setIsLoading(true);
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) {
@@ -347,9 +343,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [fetchUserProfile, toast, setIsLoading]);
 
-  const resendVerificationEmail = async () => {
+  const resendVerificationEmail = useCallback(async () => {
     setIsLoading(true);
     const firebaseUser = auth.currentUser;
     if (firebaseUser && !firebaseUser.emailVerified) {
@@ -379,35 +375,38 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       toast({ title: "Error", description: "Usuario no encontrado.", variant: "destructive" });
       setIsLoading(false);
     }
-  };
+  }, [toast, setIsLoading]);
+
+  const contextValue = useMemo(() => ({
+    user,
+    userProfile,
+    isLoadingUserProfile,
+    isLoading,
+    login,
+    signup,
+    logout,
+    loginWithGoogle,
+    resetPassword,
+    updateUserPassword,
+    updateUserProfileDetails,
+    resendVerificationEmail,
+    fetchUserProfile,
+  }), [
+    user, userProfile, isLoadingUserProfile, isLoading,
+    login, signup, logout, loginWithGoogle, resetPassword,
+    updateUserPassword, updateUserProfileDetails, resendVerificationEmail, fetchUserProfile
+  ]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        userProfile,
-        isLoadingUserProfile,
-        login,
-        signup,
-        logout,
-        loginWithGoogle,
-        resetPassword,
-        updateUserPassword,
-        updateUserProfileDetails,
-        resendVerificationEmail,
-        isLoading,
-        fetchUserProfile,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  return (
-    <React.Suspense fallback={<div className="flex h-screen w-screen items-center justify-center"><p>Cargando autenticación...</p></div>}>
-      <AuthProviderInternal>{children}</AuthProviderInternal>
-    </React.Suspense>
-  );
+  // Removed React.Suspense wrapper as it might interact unexpectedly with context/auth flow
+  // The AuthProviderInternal itself handles loading states.
+  return <AuthProviderInternal>{children}</AuthProviderInternal>;
 };
+
