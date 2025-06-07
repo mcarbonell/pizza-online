@@ -6,11 +6,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus } from 'lucide-react';
+import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus, ClipboardList, RefreshCcw } from 'lucide-react';
 import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, query, orderBy, writeBatch, doc, updateDoc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
-import type { Product } from '@/lib/types';
+import type { Product, Order } from '@/lib/types';
 import { initialProductData } from '@/data/products';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from "react-hook-form";
@@ -38,7 +38,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Added AlertDialogTrigger
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -56,6 +56,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 
 const productCategories = ['Pizzas', 'Sides', 'Drinks', 'Desserts'] as const;
+const orderStatuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'] as const;
 const DEFAULT_PLACEHOLDER_IMAGE = 'https://placehold.co/600x400.png';
 
 const productFormSchema = z.object({
@@ -83,75 +84,74 @@ export default function AdminPage() {
   const { user, userProfile, isLoading: authIsLoading, isLoadingUserProfile } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  
+  // Product States
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [productError, setProductError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
-
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
+  // Order States
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  const [isUpdatingOrderStatus, setIsUpdatingOrderStatus] = useState(false);
+
   const editForm = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
-      name: "",
-      description: "",
-      price: 0,
-      category: "Pizzas",
-      imageUrl: "",
-      dataAiHint: "",
+      name: "", description: "", price: 0, category: "Pizzas", imageUrl: "", dataAiHint: "",
     },
   });
 
   const addForm = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
-      name: "",
-      description: "",
-      price: 0,
-      category: "Pizzas",
-      imageUrl: DEFAULT_PLACEHOLDER_IMAGE, 
-      dataAiHint: "",
+      name: "", description: "", price: 0, category: "Pizzas", imageUrl: DEFAULT_PLACEHOLDER_IMAGE, dataAiHint: "",
     },
   });
 
   const resetImageStates = () => {
-    setImageFile(null);
-    setImagePreview(null);
-    setUploadProgress(null);
-    setIsUploading(false);
+    setImageFile(null); setImagePreview(null); setUploadProgress(null); setIsUploading(false);
   };
 
   const fetchProducts = useCallback(async () => {
-    setIsLoadingProducts(true);
-    setProductError(null);
+    setIsLoadingProducts(true); setProductError(null);
     try {
-      const productsCollectionRef = collection(db, 'products');
-      const q = query(productsCollectionRef, orderBy('category'), orderBy('name'));
+      const q = query(collection(db, 'products'), orderBy('category'), orderBy('name'));
       const querySnapshot = await getDocs(q);
-      const productsData = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.id,
-        ...docSnap.data()
-      } as Product));
-      setProducts(productsData);
+      setProducts(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Product)));
     } catch (err) {
       console.error("Error fetching products for admin:", err);
-      setProductError("Failed to load products. Ensure Firestore is configured correctly and the 'products' collection exists or can be created.");
+      setProductError("Failed to load products.");
     } finally {
       setIsLoadingProducts(false);
     }
   }, []);
 
+  const fetchOrders = useCallback(async () => {
+    setIsLoadingOrders(true); setOrderError(null);
+    try {
+      const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      setOrders(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Order)));
+    } catch (err) {
+      console.error("Error fetching orders for admin:", err);
+      setOrderError("Failed to load orders.");
+    } finally {
+      setIsLoadingOrders(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!authIsLoading && !isLoadingUserProfile) {
@@ -161,619 +161,216 @@ export default function AdminPage() {
         router.push('/');
       } else if (userProfile && userProfile.role === 'admin') {
         fetchProducts();
+        fetchOrders();
       }
     }
-  }, [user, userProfile, authIsLoading, isLoadingUserProfile, router, fetchProducts]);
+  }, [user, userProfile, authIsLoading, isLoadingUserProfile, router, fetchProducts, fetchOrders]);
 
   useEffect(() => {
     if (editingProduct) {
       editForm.reset({
-        name: editingProduct.name,
-        description: editingProduct.description,
-        price: editingProduct.price,
+        name: editingProduct.name, description: editingProduct.description, price: editingProduct.price,
         category: editingProduct.category as typeof productCategories[number],
-        imageUrl: editingProduct.imageUrl,
-        dataAiHint: editingProduct.dataAiHint || "",
+        imageUrl: editingProduct.imageUrl, dataAiHint: editingProduct.dataAiHint || "",
       });
-      setImagePreview(editingProduct.imageUrl || null);
-      setImageFile(null); 
-      setUploadProgress(null);
+      setImagePreview(editingProduct.imageUrl || null); resetImageStates();
     } else {
        editForm.reset(editForm.formState.defaultValues); 
     }
   }, [editingProduct, editForm]);
 
-
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
-    } else {
-      setImageFile(null);
-      setImagePreview(null);
-    }
+    if (file) { setImageFile(file); setImagePreview(URL.createObjectURL(file)); } 
+    else { setImageFile(null); setImagePreview(null); }
   };
 
   const handleImportInitialMenu = async () => {
     setIsImporting(true);
     try {
       const batch = writeBatch(db);
-      const productsCollectionRef = collection(db, 'products');
-
-      initialProductData.forEach(productData => {
-        const newProductRef = doc(productsCollectionRef);
-        batch.set(newProductRef, productData);
-      });
-
+      initialProductData.forEach(p => batch.set(doc(collection(db, 'products')), p));
       await batch.commit();
-      toast({
-        title: "Menú Importado",
-        description: `${initialProductData.length} productos han sido importados a Firestore.`,
-        variant: "default",
-      });
+      toast({ title: "Menú Importado", description: `${initialProductData.length} productos importados.` });
       fetchProducts();
     } catch (error) {
       console.error("Error importing initial menu:", error);
-      toast({
-        title: "Error de Importación",
-        description: "No se pudo importar el menú inicial. Revisa la consola para más detalles.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsImporting(false);
-    }
+      toast({ title: "Error de Importación", description: "No se pudo importar el menú.", variant: "destructive" });
+    } finally { setIsImporting(false); }
   };
 
-  const handleOpenEditModal = (product: Product) => {
-    setEditingProduct(product);
-    setIsEditModalOpen(true);
-  };
-  
-  const handleOpenAddModal = () => {
-    addForm.reset({
-        name: "",
-        description: "",
-        price: 0,
-        category: "Pizzas",
-        imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
-        dataAiHint: "",
-    });
-    resetImageStates();
-    setIsAddModalOpen(true);
-  };
+  const handleOpenEditModal = (product: Product) => { setEditingProduct(product); setIsEditModalOpen(true); };
+  const handleOpenAddModal = () => { addForm.reset(); resetImageStates(); setIsAddModalOpen(true); };
+  const handleOpenDeleteAlert = (product: Product) => { setProductToDelete(product); setIsDeleteAlertOpen(true); };
 
   const handleUpdateProduct = async (formData: ProductFormValues) => {
     if (!editingProduct) return;
-
-    setIsUploading(true);
-    setUploadProgress(0);
-
+    setIsUploading(true); setUploadProgress(0);
     let finalImageUrl = editingProduct.imageUrl; 
-
     try {
       if (imageFile) {
-        // Delete old image from storage if it's a Firebase Storage URL and not a placeholder
         if (editingProduct.imageUrl && editingProduct.imageUrl.includes("firebasestorage.googleapis.com") && editingProduct.imageUrl !== DEFAULT_PLACEHOLDER_IMAGE) {
-          try {
-            const oldImageRef = storageRef(storage, editingProduct.imageUrl);
-            await deleteObject(oldImageRef);
-          } catch (error) {
-            console.warn("Could not delete old image or it didn't exist:", error);
-          }
+          try { await deleteObject(storageRef(storage, editingProduct.imageUrl)); } 
+          catch (error) { console.warn("Could not delete old image:", error); }
         }
-
-        const imageStoragePath = `products/${editingProduct.id}/${imageFile.name}`;
-        const imageStorageRefInstance = storageRef(storage, imageStoragePath);
-        const uploadTask = uploadBytesResumable(imageStorageRefInstance, imageFile);
-
+        const uploadTask = uploadBytesResumable(storageRef(storage, `products/${editingProduct.id}/${imageFile.name}`), imageFile);
         finalImageUrl = await new Promise<string>((resolve, reject) => {
-          uploadTask.on('state_changed',
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(progress);
-            },
-            (error) => {
-              console.error("Upload failed:", error);
-              reject(error);
-            },
-            async () => {
-              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-              resolve(downloadURL);
-            }
-          );
+          uploadTask.on('state_changed', (s) => setUploadProgress((s.bytesTransferred / s.totalBytes) * 100), reject, 
+          async () => resolve(await getDownloadURL(uploadTask.snapshot.ref)));
         });
       }
-
-      const productDataToUpdate = {
-        ...formData,
-        price: Number(formData.price), 
-        imageUrl: finalImageUrl,
-      };
-      
-      const productRef = doc(db, 'products', editingProduct.id);
-      await updateDoc(productRef, productDataToUpdate);
-      
-      toast({
-        title: "Producto Actualizado",
-        description: `El producto "${productDataToUpdate.name}" ha sido actualizado.`,
-      });
-      setIsEditModalOpen(false);
-      setEditingProduct(null);
-      resetImageStates();
-      fetchProducts();
-
+      await updateDoc(doc(db, 'products', editingProduct.id), { ...formData, price: Number(formData.price), imageUrl: finalImageUrl });
+      toast({ title: "Producto Actualizado", description: `"${formData.name}" actualizado.` });
+      setIsEditModalOpen(false); setEditingProduct(null); resetImageStates(); fetchProducts();
     } catch (error) {
-      console.error("Error updating product or uploading image:", error);
-      toast({
-        title: "Error al Actualizar",
-        description: "No se pudo actualizar el producto. Revisa la consola.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(null);
-    }
+      console.error("Error updating product:", error);
+      toast({ title: "Error al Actualizar", description: "No se pudo actualizar.", variant: "destructive" });
+    } finally { setIsUploading(false); setUploadProgress(null); }
   };
   
   const handleAddNewProduct = async (formData: ProductFormValues) => {
-    setIsUploading(true);
-    setUploadProgress(0);
-    
+    setIsUploading(true); setUploadProgress(0);
     try {
-      const productDataForFirestore = {
-        ...formData,
-        price: Number(formData.price), 
-        imageUrl: '', 
-        createdAt: serverTimestamp(),
-      };
-      
-      const docRef = await addDoc(collection(db, 'products'), productDataForFirestore);
-      const newProductId = docRef.id;
+      const newDocRef = await addDoc(collection(db, 'products'), { ...formData, price: Number(formData.price), imageUrl: '', createdAt: serverTimestamp() });
       let finalImageUrl = DEFAULT_PLACEHOLDER_IMAGE;
-
       if (imageFile) {
-        const imageStoragePath = `products/${newProductId}/${imageFile.name}`;
-        const imageStorageRefInstance = storageRef(storage, imageStoragePath);
-        const uploadTask = uploadBytesResumable(imageStorageRefInstance, imageFile);
-
+        const uploadTask = uploadBytesResumable(storageRef(storage, `products/${newDocRef.id}/${imageFile.name}`), imageFile);
         finalImageUrl = await new Promise<string>((resolve, reject) => {
-          uploadTask.on('state_changed',
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(progress);
-            },
-            (error) => { console.error("Upload failed:", error); reject(error); },
-            async () => {
-              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-              resolve(downloadURL);
-            }
-          );
+          uploadTask.on('state_changed', (s) => setUploadProgress((s.bytesTransferred / s.totalBytes) * 100), reject, 
+          async () => resolve(await getDownloadURL(uploadTask.snapshot.ref)));
         });
-        await updateDoc(docRef, { imageUrl: finalImageUrl });
-      } else {
-         await updateDoc(docRef, { imageUrl: finalImageUrl }); // Save placeholder if no image uploaded
       }
-      
-      toast({
-        title: "Producto Añadido",
-        description: `El producto "${formData.name}" ha sido añadido correctamente.`,
-      });
-      setIsAddModalOpen(false);
-      resetImageStates();
-      addForm.reset();
-      fetchProducts();
-
+      await updateDoc(newDocRef, { imageUrl: finalImageUrl });
+      toast({ title: "Producto Añadido", description: `"${formData.name}" añadido.` });
+      setIsAddModalOpen(false); resetImageStates(); addForm.reset(); fetchProducts();
     } catch (error) {
-      console.error("Error adding new product or uploading image:", error);
-      toast({
-        title: "Error al Añadir Producto",
-        description: "No se pudo añadir el producto. Revisa la consola.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(null);
-    }
-  };
-
-  const handleOpenDeleteAlert = (product: Product) => {
-    setProductToDelete(product);
-    setIsDeleteAlertOpen(true);
+      console.error("Error adding product:", error);
+      toast({ title: "Error al Añadir", description: "No se pudo añadir.", variant: "destructive" });
+    } finally { setIsUploading(false); setUploadProgress(null); }
   };
 
   const handleConfirmDelete = async () => {
     if (!productToDelete) return;
-
     setIsDeletingProduct(true);
     try {
-      // Delete image from Firebase Storage if it's a Firebase URL and not the default placeholder
       if (productToDelete.imageUrl && productToDelete.imageUrl.includes("firebasestorage.googleapis.com") && productToDelete.imageUrl !== DEFAULT_PLACEHOLDER_IMAGE) {
-        try {
-          const imageRef = storageRef(storage, productToDelete.imageUrl);
-          await deleteObject(imageRef);
-        } catch (storageError: any) {
-          // Log error but continue if image deletion fails (e.g., file not found)
-          console.warn(`Could not delete image ${productToDelete.imageUrl} from Storage:`, storageError);
-           if (storageError.code !== 'storage/object-not-found') {
-            toast({
-                title: "Advertencia de eliminación de imagen",
-                description: `No se pudo eliminar la imagen del almacenamiento, pero el producto se eliminará de la base de datos. Error: ${storageError.message}`,
-                variant: "default", // Use default variant for warnings that are not critical
-                duration: 7000,
-            });
-           }
+        try { await deleteObject(storageRef(storage, productToDelete.imageUrl)); } 
+        catch (storageError: any) { 
+          console.warn(`Could not delete image ${productToDelete.imageUrl}:`, storageError);
+          if (storageError.code !== 'storage/object-not-found') {
+            toast({ title: "Advertencia", description: `Imagen no eliminada: ${storageError.message}`, duration: 7000 });
+          }
         }
       }
-
-      // Delete product document from Firestore
       await deleteDoc(doc(db, 'products', productToDelete.id));
-
-      toast({
-        title: "Producto Eliminado",
-        description: `El producto "${productToDelete.name}" ha sido eliminado.`,
-      });
-      fetchProducts(); // Refresh product list
+      toast({ title: "Producto Eliminado", description: `"${productToDelete.name}" eliminado.` });
+      fetchProducts();
     } catch (error: any) {
       console.error("Error deleting product:", error);
-      toast({
-        title: "Error al Eliminar",
-        description: `No se pudo eliminar el producto "${productToDelete.name}". Revisa la consola.`,
-        variant: "destructive",
-      });
+      toast({ title: "Error al Eliminar", description: `No se pudo eliminar "${productToDelete.name}".`, variant: "destructive" });
+    } finally { setIsDeletingProduct(false); setIsDeleteAlertOpen(false); setProductToDelete(null); }
+  };
+
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: typeof orderStatuses[number]) => {
+    setIsUpdatingOrderStatus(true);
+    try {
+      await updateDoc(doc(db, 'orders', orderId), { status: newStatus, updatedAt: serverTimestamp() });
+      toast({ title: "Estado del Pedido Actualizado", description: `El pedido #${orderId.substring(0,6)}... ahora está ${newStatus}.` });
+      fetchOrders(); // Refresh orders
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      toast({ title: "Error al Actualizar Estado", description: "No se pudo actualizar el estado del pedido.", variant: "destructive" });
     } finally {
-      setIsDeletingProduct(false);
-      setIsDeleteAlertOpen(false);
-      setProductToDelete(null);
+      setIsUpdatingOrderStatus(false);
     }
   };
 
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return 'N/A';
+    return timestamp.toDate ? timestamp.toDate().toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha inválida';
+  };
 
   if (authIsLoading || isLoadingUserProfile) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Cargando panel de administración...</p>
-      </div>
-    );
+    return <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary mb-4" /><p>Cargando...</p></div>;
   }
-
   if (!user || (userProfile && userProfile.role !== 'admin')) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
-        <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
-        <p className="text-lg text-muted-foreground">Acceso denegado. Debes ser administrador.</p>
-         <Button onClick={() => router.push('/')} variant="link" className="mt-4">Volver al inicio</Button>
-      </div>
-    );
+    return <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]"><ShieldAlert className="h-12 w-12 text-destructive mb-4" /><p>Acceso denegado.</p><Button onClick={() => router.push('/')} variant="link">Inicio</Button></div>;
   }
 
   const renderProductFormFields = (currentForm: typeof editForm | typeof addForm, currentImagePreview: string | null) => (
     <>
-      <FormField
-        control={currentForm.control}
-        name="name"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Nombre del Producto</FormLabel>
-            <FormControl><Input placeholder="Ej: Pizza Margherita" {...field} /></FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={currentForm.control}
-        name="description"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Descripción</FormLabel>
-            <FormControl><Textarea placeholder="Describe el producto..." {...field} rows={3} /></FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+      <FormField control={currentForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+      <FormField control={currentForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Descripción</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl><FormMessage /></FormItem>)} />
       <div className="grid grid-cols-2 gap-4">
-        <FormField
-          control={currentForm.control}
-          name="price"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Precio (€)</FormLabel>
-              <FormControl><Input type="number" placeholder="0.00" {...field} step="0.01" /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={currentForm.control}
-          name="category"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Categoría</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una categoría" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {productCategories.map(category => (
-                    <SelectItem key={category} value={category}>{category}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <FormField control={currentForm.control} name="price" render={({ field }) => (<FormItem><FormLabel>Precio (€)</FormLabel><FormControl><Input type="number" {...field} step="0.01" /></FormControl><FormMessage /></FormItem>)} />
+        <FormField control={currentForm.control} name="category" render={({ field }) => (<FormItem><FormLabel>Categoría</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{productCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
       </div>
-      
-      <FormItem>
-        <FormLabel>Imagen del Producto</FormLabel>
+      <FormItem><FormLabel>Imagen</FormLabel>
         <div className="space-y-2">
           {(currentImagePreview || (editingProduct && currentForm === editForm && editingProduct.imageUrl)) && (
             <div className="relative w-full h-48 rounded-md overflow-hidden border">
-              <Image
-                src={currentImagePreview || (editingProduct && currentForm === editForm ? editingProduct.imageUrl : DEFAULT_PLACEHOLDER_IMAGE)}
-                alt={currentForm.getValues('name') || "Vista previa"}
-                layout="fill"
-                objectFit="cover"
-              />
+              <Image src={currentImagePreview || (editingProduct && currentForm === editForm ? editingProduct.imageUrl : DEFAULT_PLACEHOLDER_IMAGE)} alt={currentForm.getValues('name') || "Vista previa"} layout="fill" objectFit="cover" />
             </div>
           )}
-          <FormControl>
-            <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" size="sm" asChild>
-                <label htmlFor="image-upload-modal" className="cursor-pointer flex items-center gap-2">
-                    <ImagePlus className="h-4 w-4" />
-                    {imageFile ? "Cambiar imagen" : "Subir imagen"}
-                </label>
-                </Button>
-                <Input id="image-upload-modal" type="file" accept="image/*" onChange={handleImageFileChange} className="hidden" />
-                {imageFile && <span className="text-xs text-muted-foreground truncate max-w-[150px]">{imageFile.name}</span>}
-            </div>
-          </FormControl>
-          {isUploading && uploadProgress !== null && (
-            <div className="space-y-1">
-                <Progress value={uploadProgress} className="w-full h-2" />
-                <p className="text-xs text-muted-foreground text-center">{Math.round(uploadProgress)}% subido</p>
-            </div>
-          )}
+          <FormControl><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" asChild><label htmlFor="img-upload-modal" className="cursor-pointer flex items-center gap-2"><ImagePlus className="h-4 w-4" />{imageFile ? "Cambiar" : "Subir"}</label></Button><Input id="img-upload-modal" type="file" accept="image/*" onChange={handleImageFileChange} className="hidden" />{imageFile && <span className="text-xs truncate max-w-[150px]">{imageFile.name}</span>}</div></FormControl>
+          {isUploading && uploadProgress !== null && (<div className="space-y-1"><Progress value={uploadProgress} className="w-full h-2" /><p className="text-xs text-center">{Math.round(uploadProgress)}%</p></div>)}
         </div>
       </FormItem>
-
-      <FormField
-        control={currentForm.control}
-        name="dataAiHint"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Pista para IA (Opcional, 1-2 palabras)</FormLabel>
-            <FormControl><Input placeholder="ej: pepperoni pizza" {...field} /></FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+      <FormField control={currentForm.control} name="dataAiHint" render={({ field }) => (<FormItem><FormLabel>Pista IA (1-2 palabras)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
     </>
   );
 
-
   return (
-    <div className="container mx-auto py-12 px-4">
+    <div className="container mx-auto py-12 px-4 space-y-12">
       <Card className="shadow-xl">
-        <CardHeader className="border-b pb-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <CardTitle className="text-3xl font-headline flex items-center gap-2">
-                <LayoutDashboard className="h-8 w-8 text-primary" /> Panel de Administración
-              </CardTitle>
-              <CardDescription>Gestiona productos, pedidos y más.</CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" disabled={isImporting || isUploading || isDeletingProduct}>
-                    {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-                    Importar Menú Inicial
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Confirmar Importación de Menú?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Esto añadirá los productos del menú inicial a la colección 'products' en Firestore.
-                      Esta acción no borrará los productos existentes, solo añadirá los nuevos.
-                      Asegúrate de que las reglas de seguridad de Firestore permitan la escritura.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isImporting}>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleImportInitialMenu} disabled={isImporting}>
-                      {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Confirmar e Importar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-              <Button onClick={handleOpenAddModal} disabled={isImporting || isUploading || isDeletingProduct}>
-                <PackagePlus className="mr-2 h-4 w-4" /> Añadir Producto
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
+        <CardHeader className="border-b pb-4"><div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"><div><CardTitle className="text-3xl font-headline flex items-center gap-2"><LayoutDashboard /> Panel Admin</CardTitle><CardDescription>Gestiona productos y pedidos.</CardDescription></div><div className="flex gap-2"><AlertDialog><AlertDialogTrigger asChild><Button variant="outline" disabled={isImporting || isUploading || isDeletingProduct || isUpdatingOrderStatus}><UploadCloud />Importar Menú</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Confirmar Importación?</AlertDialogTitle><AlertDialogDescription>Añadirá productos iniciales. No borrará existentes.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isImporting}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleImportInitialMenu} disabled={isImporting}>{isImporting && <Loader2 className="animate-spin"/>}Confirmar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><Button onClick={handleOpenAddModal} disabled={isImporting || isUploading || isDeletingProduct || isUpdatingOrderStatus}><PackagePlus />Añadir Producto</Button></div></div></CardHeader>
         <CardContent className="pt-6">
-          <h2 className="text-2xl font-headline mb-6 flex items-center gap-2">
-            <ShoppingBasket className="h-6 w-6 text-primary" /> Lista de Productos
-          </h2>
-          {isLoadingProducts ? (
-            <div className="flex justify-center items-center py-10">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-              <p className="text-muted-foreground">Cargando productos...</p>
-            </div>
-          ) : productError ? (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error al Cargar Productos</AlertTitle>
-              <AlertDescription>{productError}</AlertDescription>
-            </Alert>
-          ) : products.length === 0 ? (
-             <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>No Hay Productos</AlertTitle>
-              <AlertDescription>
-                No se encontraron productos en la base de datos. Puedes usar "Importar Menú Inicial" o "Añadir Producto".
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableCaption>Una lista de todos los productos disponibles en Firestore.</TableCaption>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[60px] sm:w-[80px]">Imagen</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead className="hidden md:table-cell">Categoría</TableHead>
-                    <TableHead className="hidden lg:table-cell max-w-[300px] truncate">Descripción</TableHead>
-                    <TableHead className="text-right">Precio</TableHead>
-                    <TableHead className="text-center">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell>
-                        <Image
-                          src={product.imageUrl || DEFAULT_PLACEHOLDER_IMAGE}
-                          alt={product.name}
-                          width={48}
-                          height={48}
-                          className="rounded object-cover"
-                          data-ai-hint={product.dataAiHint}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                       <TableCell className="hidden md:table-cell">
-                        <Badge variant="secondary">{product.category}</Badge>
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell text-xs text-muted-foreground max-w-[300px] truncate" title={product.description}>
-                        {product.description}
-                      </TableCell>
-                      <TableCell className="text-right">€{product.price.toFixed(2)}</TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center gap-1 sm:gap-2">
-                          <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => handleOpenEditModal(product)} disabled={isUploading || isDeletingProduct}>
-                            <Edit className="h-4 w-4" />
-                             <span className="sr-only">Editar</span>
-                          </Button>
-                          <Button variant="destructive" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => handleOpenDeleteAlert(product)} disabled={isUploading || isDeletingProduct}>
-                            <Trash2 className="h-4 w-4" />
-                             <span className="sr-only">Eliminar</span>
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <h2 className="text-2xl font-headline mb-6 flex items-center gap-2"><ShoppingBasket />Lista de Productos</h2>
+          {isLoadingProducts ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando...</div>)
+          : productError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{productError}</AlertDescription></Alert>)
+          : products.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Productos</AlertTitle><AlertDescription>Usa "Importar Menú" o "Añadir Producto".</AlertDescription></Alert>)
+          : (<div className="overflow-x-auto"><Table><TableCaption>Productos en Firestore.</TableCaption><TableHeader><TableRow><TableHead>Imagen</TableHead><TableHead>Nombre</TableHead><TableHead className="hidden md:table-cell">Categoría</TableHead><TableHead className="hidden lg:table-cell max-w-[300px] truncate">Descripción</TableHead><TableHead className="text-right">Precio</TableHead><TableHead className="text-center">Acciones</TableHead></TableRow></TableHeader>
+              <TableBody>{products.map((p) => (<TableRow key={p.id}><TableCell><Image src={p.imageUrl || DEFAULT_PLACEHOLDER_IMAGE} alt={p.name} width={48} height={48} className="rounded object-cover" data-ai-hint={p.dataAiHint}/></TableCell><TableCell className="font-medium">{p.name}</TableCell><TableCell className="hidden md:table-cell"><Badge variant="secondary">{p.category}</Badge></TableCell><TableCell className="hidden lg:table-cell text-xs max-w-[300px] truncate" title={p.description}>{p.description}</TableCell><TableCell className="text-right">€{p.price.toFixed(2)}</TableCell><TableCell className="text-center"><div className="flex justify-center gap-1 sm:gap-2"><Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenEditModal(p)} disabled={isUploading || isDeletingProduct || isUpdatingOrderStatus}><Edit /></Button><Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleOpenDeleteAlert(p)} disabled={isUploading || isDeletingProduct || isUpdatingOrderStatus}><Trash2 /></Button></div></TableCell></TableRow>))}</TableBody>
+            </Table></div>)}
         </CardContent>
-        <CardFooter className="border-t pt-4">
-            <p className="text-xs text-muted-foreground">
-                Gestión completa de productos (CRUD).
-            </p>
-        </CardFooter>
+        <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión CRUD de productos.</p></CardFooter>
       </Card>
 
-      {/* Edit Product Dialog */}
-      <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => {
-        setIsEditModalOpen(isOpen);
-        if (!isOpen) {
-          setEditingProduct(null); 
-          editForm.reset();
-          resetImageStates();
-        }
-      }}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Edit className="h-5 w-5"/> Editar Producto</DialogTitle>
-            <DialogDescription>
-              Modifica los detalles del producto "{editingProduct?.name}". Haz clic en guardar cuando termines.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(handleUpdateProduct)} className="space-y-4 py-4">
-              {renderProductFormFields(editForm, imagePreview || editingProduct?.imageUrl || null)}
-              <DialogFooter className="mt-6">
-                <DialogClose asChild>
-                  <Button type="button" variant="ghost" disabled={isUploading || isDeletingProduct}>Cancelar</Button>
-                </DialogClose>
-                <Button type="submit" disabled={isUploading || editForm.formState.isSubmitting || isDeletingProduct}>
-                  {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  {isUploading ? 'Subiendo...' : 'Guardar Cambios'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+      <Card className="shadow-xl">
+        <CardHeader className="border-b pb-4"><div className="flex justify-between items-center"><CardTitle className="text-3xl font-headline flex items-center gap-2"><ClipboardList /> Pedidos Recibidos</CardTitle><Button variant="outline" size="sm" onClick={fetchOrders} disabled={isLoadingOrders || isUpdatingOrderStatus}><RefreshCcw className={isLoadingOrders ? "animate-spin" : ""} /> Refrescar</Button></div></CardHeader>
+        <CardContent className="pt-6">
+          {isLoadingOrders ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando pedidos...</div>)
+          : orderError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{orderError}</AlertDescription></Alert>)
+          : orders.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Pedidos</AlertTitle><AlertDescription>Aún no se han realizado pedidos.</AlertDescription></Alert>)
+          : (<div className="overflow-x-auto"><Table><TableCaption>Pedidos registrados en Firestore.</TableCaption><TableHeader><TableRow><TableHead>ID Pedido</TableHead><TableHead>Fecha</TableHead><TableHead>Cliente (Email)</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-center">Estado</TableHead></TableRow></TableHeader>
+              <TableBody>{orders.map((order) => (<TableRow key={order.id}><TableCell className="font-mono text-xs">{order.id?.substring(0,8)}...</TableCell><TableCell>{formatDate(order.createdAt)}</TableCell><TableCell>{order.shippingAddress.email}</TableCell><TableCell className="text-right">€{order.totalAmount.toFixed(2)}</TableCell><TableCell className="text-center">
+                <Select value={order.status} onValueChange={(newStatus) => handleUpdateOrderStatus(order.id!, newStatus as typeof orderStatuses[number])} disabled={isUpdatingOrderStatus || isLoadingOrders}>
+                    <SelectTrigger className="w-[150px] h-9 text-xs"><SelectValue placeholder="Cambiar estado" /></SelectTrigger>
+                    <SelectContent>{orderStatuses.map(status => (<SelectItem key={status} value={status} className="text-xs">{status}</SelectItem>))}</SelectContent>
+                </Select>
+              </TableCell></TableRow>))}</TableBody>
+            </Table></div>)}
+        </CardContent>
+         <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión de estados de pedidos.</p></CardFooter>
+      </Card>
+
+      <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => { setIsEditModalOpen(isOpen); if (!isOpen) { setEditingProduct(null); editForm.reset(); resetImageStates();}}}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="flex items-center gap-2"><Edit/>Editar Producto</DialogTitle><DialogDescription>Modifica "{editingProduct?.name}".</DialogDescription></DialogHeader>
+          <Form {...editForm}><form onSubmit={editForm.handleSubmit(handleUpdateProduct)} className="space-y-4 py-4">{renderProductFormFields(editForm, imagePreview || editingProduct?.imageUrl || null)}<DialogFooter className="mt-6"><DialogClose asChild><Button type="button" variant="ghost" disabled={isUploading || isDeletingProduct || isUpdatingOrderStatus}>Cancelar</Button></DialogClose><Button type="submit" disabled={isUploading || editForm.formState.isSubmitting || isDeletingProduct || isUpdatingOrderStatus}>{isUploading?<Loader2 className="animate-spin"/>:<Save/>}{isUploading?'Subiendo...':'Guardar'}</Button></DialogFooter></form></Form>
         </DialogContent>
       </Dialog>
 
-      {/* Add Product Dialog */}
-      <Dialog open={isAddModalOpen} onOpenChange={(isOpen) => {
-        setIsAddModalOpen(isOpen);
-        if (!isOpen) {
-          addForm.reset();
-          resetImageStates();
-        }
-      }}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><PackagePlus className="h-5 w-5"/> Añadir Nuevo Producto</DialogTitle>
-            <DialogDescription>
-              Completa los detalles para añadir un nuevo producto al menú.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...addForm}>
-            <form onSubmit={addForm.handleSubmit(handleAddNewProduct)} className="space-y-4 py-4">
-              {renderProductFormFields(addForm, imagePreview)}
-              <DialogFooter className="mt-6">
-                <DialogClose asChild>
-                  <Button type="button" variant="ghost" disabled={isUploading || isDeletingProduct}>Cancelar</Button>
-                </DialogClose>
-                <Button type="submit" disabled={isUploading || addForm.formState.isSubmitting || isDeletingProduct}>
-                  {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  {isUploading ? 'Subiendo...' : 'Añadir Producto'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+      <Dialog open={isAddModalOpen} onOpenChange={(isOpen) => { setIsAddModalOpen(isOpen); if (!isOpen) { addForm.reset(); resetImageStates();}}}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="flex items-center gap-2"><PackagePlus/>Añadir Producto</DialogTitle><DialogDescription>Completa los detalles.</DialogDescription></DialogHeader>
+          <Form {...addForm}><form onSubmit={addForm.handleSubmit(handleAddNewProduct)} className="space-y-4 py-4">{renderProductFormFields(addForm, imagePreview)}<DialogFooter className="mt-6"><DialogClose asChild><Button type="button" variant="ghost" disabled={isUploading || isDeletingProduct || isUpdatingOrderStatus}>Cancelar</Button></DialogClose><Button type="submit" disabled={isUploading || addForm.formState.isSubmitting || isDeletingProduct || isUpdatingOrderStatus}>{isUploading?<Loader2 className="animate-spin"/>:<Save/>}{isUploading?'Subiendo...':'Añadir'}</Button></DialogFooter></form></Form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Product Alert Dialog */}
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro de que quieres eliminar este producto?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente el producto "{productToDelete?.name}" de la base de datos y su imagen asociada del almacenamiento (si existe).
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setProductToDelete(null)} disabled={isDeletingProduct}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleConfirmDelete} 
-              disabled={isDeletingProduct}
-              className={buttonVariants({ variant: "destructive" })}
-            >
-              {isDeletingProduct ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {isDeletingProduct ? 'Eliminando...' : 'Eliminar Producto'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Eliminar "{productToDelete?.name}"?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará de Firestore y Storage.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel onClick={() => setProductToDelete(null)} disabled={isDeletingProduct}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleConfirmDelete} disabled={isDeletingProduct} className={buttonVariants({ variant: "destructive" })}>{isDeletingProduct && <Loader2 className="animate-spin"/>}{isDeletingProduct ? 'Eliminando...' : 'Eliminar'}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </div>
   );
 }
-
-    

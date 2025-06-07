@@ -6,7 +6,8 @@ Este documento registra las características y tareas que ya se han completado e
 - **Menú Interactivo de Productos:**
     - [x] Visualización de productos por categorías (Pizzas, Acompañamientos, Bebidas, Postres).
     - [x] Tarjetas de producto con nombre, descripción, precio e imagen.
-    - [x] Datos de productos cargados desde un archivo estático (`src/data/products.ts`).
+    - [x] Datos de productos cargados desde un archivo estático (`src/data/products.ts`) para importación inicial.
+    - [x] Productos ahora cargados desde Firestore en la página principal.
 - **Carrito de Compras:**
     - [x] Añadir productos al carrito desde las tarjetas de producto.
     - [x] Sidebar del carrito para ver los artículos añadidos.
@@ -23,6 +24,8 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Resumen del pedido en la página de checkout.
     - [x] Redirección a la página principal y limpieza del carrito tras un "pago" exitoso.
     - [x] Mensaje de "Carrito vacío" en la página de checkout si no hay artículos.
+    - [x] Guardado de pedido en Firestore.
+    - [x] Opción para guardar dirección de envío y método de pago (simulado) en el perfil del usuario.
 - **Diseño y UI/UX:**
     - [x] Diseño responsivo adaptado a dispositivos móviles, tabletas y escritorio.
     - [x] Interfaz de usuario moderna y atractiva utilizando ShadCN UI components.
@@ -38,7 +41,32 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Estructura de carpetas organizada para componentes, contexto, datos, hooks, etc.
     - [x] Configuración inicial de Genkit (preparado para funcionalidades de IA).
     - [x] Configuración de ESLint y Prettier (asumido por Next.js y buenas prácticas).
-    - [x] `next.config.ts` configurado para imágenes y para ignorar errores de build de TS/ESLint temporalmente.
+    - [x] `next.config.ts` configurado para imágenes (incluyendo `firebasestorage.googleapis.com`) y para ignorar errores de build de TS/ESLint temporalmente.
+- **Autenticación de Usuarios (Firebase Auth):**
+    - [x] Integración con Firebase Authentication (Email/Password, Google).
+    - [x] Configuración de inicialización de Firebase (`src/lib/firebase.ts`).
+    - [x] `AuthContext` para gestionar estado de usuario y perfil de Firestore.
+    - [x] Páginas de Login, Signup y Forgot Password.
+    - [x] Creación/Actualización de perfiles de usuario en Firestore (colección `users`).
+    - [x] Manejo de errores y notificaciones (toasts) para operaciones de autenticación.
+    - [x] Protección de rutas (`/profile`, `/checkout`, `/admin`) y redirecciones.
+    - [x] Funcionalidad de "Olvidé mi contraseña".
+    - [x] Funcionalidad de "Cambiar Contraseña" desde el perfil.
+    - [x] Envío de correo de verificación al registrarse y opción de reenvío.
+    - [x] Visualización de estado de verificación en perfil.
+- **Perfil de Usuario:**
+    - [x] Página de perfil (`/profile`) para ver información del usuario y de Firebase Auth.
+    - [x] Visualización del historial de pedidos del usuario desde Firestore.
+    - [x] Edición de nombre, dirección de envío predeterminada y método de pago (simulado) predeterminado.
+- **Panel de Administración (`/admin`):**
+    - [x] Ruta `/admin` protegida por rol 'admin' (definido en perfil de usuario en Firestore).
+    - [x] Enlace condicional al panel de admin en el Header.
+    - [x] **Gestión de Productos (CRUD completo):**
+        - [x] Listar productos desde Firestore.
+        - [x] Importar menú inicial a Firestore.
+        - [x] Añadir nuevos productos con subida de imagen a Firebase Storage.
+        - [x] Editar productos existentes con subida/actualización de imagen a Firebase Storage.
+        - [x] Eliminar productos (con eliminación de imagen asociada de Firebase Storage).
 - **Documentación Inicial:**
     - [x] `README.md` básico explicando el proyecto. (Actualizado a versión más detallada)
     - [x] Creación de archivos de planificación del proyecto: `docs/TODO.md`, `docs/DONE.md`, `docs/ARCHITECTURE.md`, `docs/BUGS.md`.

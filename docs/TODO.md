@@ -32,6 +32,7 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
 - [x] **Verificación de Correo Electrónico (Firebase Auth):**
     - [x] Enviar correo de verificación al registrarse.
     - [x] Mostrar estado de verificación en el perfil y restringir ciertas acciones si no está verificado. (Mostrando estado, sin restringir por ahora)
+    - [x] Opción de reenviar correo de verificación.
 - [x] **Historial de Pedidos:**
     - [x] Guardar pedidos en Firestore al completar el checkout.
     - [x] Página para que los usuarios vean sus pedidos anteriores (requiere backend o Firestore).
@@ -44,9 +45,14 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
     - [x] Definir rol 'admin' en `UserProfile` (Firestore).
     - [x] Crear página básica `/admin` protegida por rol.
     - [x] Añadir enlace condicional al panel de admin en el Header.
-    - [ ] CRUD para productos (Pizzas, Acompañamientos, Bebidas, Postres) - podría usar Firestore.
+    - [x] **Gestión de Productos (CRUD completo):**
+        - [x] Listar productos desde Firestore.
+        - [x] Importar menú inicial a Firestore.
+        - [x] Añadir nuevos productos con subida de imagen a Firebase Storage.
+        - [x] Editar productos existentes con subida/actualización de imagen a Firebase Storage.
+        - [x] Eliminar productos (con eliminación de imagen asociada de Firebase Storage).
     - [ ] Gestión de categorías de productos.
-    - [ ] Visualización y gestión de pedidos recibidos.
+    - [ ] Visualización y gestión de pedidos recibidos (cambio de estado).
     - [ ] Gestión de usuarios (roles básicos).
 - [ ] **Integración de Pasarela de Pago Real:**
     - [ ] Integración con Stripe o PayPal.
@@ -71,7 +77,7 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
     - [ ] Pruebas de integración para flujos críticos (ej. proceso de compra).
     - [ ] Pruebas E2E (End-to-End) para simular la interacción del usuario.
 - [ ] **Optimización de Rendimiento:**
-    *   [ ] Revisión y optimización de la carga de imágenes.
+    *   [x] Revisión y optimización de la carga de imágenes (uso de `next/image` y `remotePatterns`).
     *   [ ] Code splitting y lazy loading donde sea aplicable.
     *   [ ] Monitorización del rendimiento (Lighthouse, Web Vitals).
 - [ ] **Mejoras de Accesibilidad (A11y):**
