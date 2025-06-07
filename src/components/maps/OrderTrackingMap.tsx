@@ -2,9 +2,8 @@
 'use client';
 
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import type { LatLngExpression } from 'leaflet';
-import { useEffect } from 'react';
+import L, { type LatLngExpression, type Map as LeafletMap } from 'leaflet';
+import { useEffect, useRef } from 'react';
 
 const defaultIcon = L.icon({
   iconUrl: '/leaflet/marker-icon.png',
@@ -29,19 +28,15 @@ function ChangeView({ center, zoom }: { center: LatLngExpression; zoom: number }
     if (map) {
       map.setView(center, zoom);
     }
-  }, [map, center, zoom]); // Ensure map is a dependency if useMap can return different instances over time
+  }, [map, center, zoom]);
   return null;
 }
 
 
 export default function OrderTrackingMap({ latitude, longitude, orderId }: OrderTrackingMapProps) {
-  // Removed mapResetKey state and its useEffect.
-  // We rely on the key prop passed to OrderTrackingMap from its parent (profile/page.tsx, key={order.id})
-  // for full component re-initialization if the order context changes.
-  // For updates to an existing map (same order, new coordinates), ChangeView should handle it.
+  const mapRef = useRef<LeafletMap | null>(null);
 
   if (typeof window === 'undefined') {
-    // This check is good for SSR, but with dynamic import, it might not be strictly necessary here.
     return <div className="h-[300px] w-full bg-muted rounded-md flex items-center justify-center"><p>Cargando mapa...</p></div>;
   }
 
@@ -52,8 +47,29 @@ export default function OrderTrackingMap({ latitude, longitude, orderId }: Order
   
   const position: LatLngExpression = [latitude, longitude];
 
+  // Effect for cleaning up the map instance on component unmount
+  useEffect(() => {
+    // This function will be called when the component unmounts
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null; // Clear the ref
+        console.log(`Leaflet map instance for order ${orderId || ''} removed.`);
+      }
+    };
+  }, [orderId]); // Re-run cleanup if orderId changes, ensuring the old map is cleaned.
+
   return (
-    <MapContainer center={position} zoom={16} style={{ height: '300px', width: '100%' }} className="rounded-md shadow-md my-4 z-0">
+    <MapContainer
+      center={position}
+      zoom={16}
+      style={{ height: '300px', width: '100%' }}
+      className="rounded-md shadow-md my-4 z-0"
+      whenCreated={(mapInstance) => {
+        mapRef.current = mapInstance;
+        console.log(`Leaflet map instance for order ${orderId || ''} created.`);
+      }}
+    >
       <ChangeView center={position} zoom={16} />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -67,4 +83,3 @@ export default function OrderTrackingMap({ latitude, longitude, orderId }: Order
     </MapContainer>
   );
 }
-
