@@ -4,7 +4,7 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { LatLngExpression } from 'leaflet';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 const defaultIcon = L.icon({
   iconUrl: '/leaflet/marker-icon.png',
@@ -26,38 +26,34 @@ interface OrderTrackingMapProps {
 function ChangeView({ center, zoom }: { center: LatLngExpression; zoom: number }) {
   const map = useMap();
   useEffect(() => {
-    // Check if the map instance is available before calling setView
     if (map) {
       map.setView(center, zoom);
     }
-  }, [map, center, zoom]);
+  }, [map, center, zoom]); // Ensure map is a dependency if useMap can return different instances over time
   return null;
 }
 
 
 export default function OrderTrackingMap({ latitude, longitude, orderId }: OrderTrackingMapProps) {
-  const [mapResetKey, setMapResetKey] = useState(Date.now()); // Key to force re-render
-
-  useEffect(() => {
-    // When latitude or longitude changes, update the key to force a re-render of MapContainer
-    // This ensures a fresh initialization if the props change significantly.
-    // We use Date.now() to ensure a unique key.
-    setMapResetKey(Date.now());
-  }, [latitude, longitude]);
+  // Removed mapResetKey state and its useEffect.
+  // We rely on the key prop passed to OrderTrackingMap from its parent (profile/page.tsx, key={order.id})
+  // for full component re-initialization if the order context changes.
+  // For updates to an existing map (same order, new coordinates), ChangeView should handle it.
 
   if (typeof window === 'undefined') {
+    // This check is good for SSR, but with dynamic import, it might not be strictly necessary here.
     return <div className="h-[300px] w-full bg-muted rounded-md flex items-center justify-center"><p>Cargando mapa...</p></div>;
   }
 
-  const position: LatLngExpression = [latitude, longitude];
-
-  // Only render MapContainer if we have valid coordinates to prevent initial issues
+  // Only render MapContainer if we have valid coordinates
   if (!latitude || !longitude) {
     return <div className="h-[300px] w-full bg-muted rounded-md flex items-center justify-center"><p>Esperando ubicación del repartidor...</p></div>;
   }
+  
+  const position: LatLngExpression = [latitude, longitude];
 
   return (
-    <MapContainer key={mapResetKey} center={position} zoom={16} style={{ height: '300px', width: '100%' }} className="rounded-md shadow-md my-4 z-0">
+    <MapContainer center={position} zoom={16} style={{ height: '300px', width: '100%' }} className="rounded-md shadow-md my-4 z-0">
       <ChangeView center={position} zoom={16} />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
