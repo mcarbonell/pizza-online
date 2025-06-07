@@ -3,14 +3,15 @@
 
 import type { User } from '@/lib/types';
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation'; // Import useSearchParams
-import { auth } from '@/lib/firebase'; // Import Firebase auth instance
+import { useRouter, useSearchParams } from 'next/navigation';
+import { auth, googleProvider } from '@/lib/firebase'; // Import Firebase auth instance and googleProvider
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut,
   updateProfile,
+  signInWithPopup, // Import signInWithPopup
   type User as FirebaseUser
 } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +21,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
+  loginWithGoogle: () => Promise<void>; // Added loginWithGoogle
   isLoading: boolean;
 }
 
@@ -37,12 +39,11 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-// This component needs to be a Client Component to use useSearchParams
 function AuthProviderInternal({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const searchParams = useSearchParams(); // Get searchParams here
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -65,14 +66,13 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged will handle setting the user state
-      const redirect = searchParams.get('redirect'); // Read redirect from searchParams
+      const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Inicio de sesión exitoso", description: "¡Bienvenido de nuevo!" });
     } catch (error: any) {
       console.error("Error during login:", error);
       toast({ title: "Error al iniciar sesión", description: error.message || "Por favor, revisa tus credenciales.", variant: "destructive" });
-      setUser(null); // Explicitly set user to null on error
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -82,32 +82,46 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      let updatedUser: User | null = null;
       if (userCredential.user) {
         if (name) {
           await updateProfile(userCredential.user, { displayName: name });
-          updatedUser = {
-            uid: userCredential.user.uid,
-            email: userCredential.user.email,
-            displayName: name,
-          };
-        } else {
-           updatedUser = {
-            uid: userCredential.user.uid,
-            email: userCredential.user.email,
-            displayName: null,
-          };
         }
-        // setUser(updatedUser); // This will be handled by onAuthStateChanged, but can set for immediate UI update.
       }
-      // onAuthStateChanged will also run, but this provides immediate feedback for redirection
-      const redirect = searchParams.get('redirect'); // Check for redirect after signup too
+      const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Registro exitoso", description: "¡Bienvenido a PizzaPlace!" });
     } catch (error: any) {
       console.error("Error during signup:", error);
       toast({ title: "Error al registrarse", description: error.message || "No se pudo crear la cuenta.", variant: "destructive" });
-      setUser(null); // Explicitly set user to null on error
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    setIsLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      // onAuthStateChanged will handle setting the user state.
+      // Firebase automatically manages persistence.
+      const redirect = searchParams.get('redirect');
+      router.push(redirect || '/profile');
+      toast({ title: "Inicio de sesión con Google exitoso", description: `¡Bienvenido, ${result.user.displayName || result.user.email}!` });
+    } catch (error: any) {
+      console.error("Error during Google login:", error);
+      let errorMessage = "No se pudo iniciar sesión con Google.";
+      if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = "El proceso de inicio de sesión con Google fue cancelado.";
+        toast({ title: "Proceso cancelado", description: errorMessage, variant: "default" });
+      } else if (error.code === 'auth/account-exists-with-different-credential') {
+        errorMessage = "Ya existe una cuenta con este correo electrónico pero con un método de inicio de sesión diferente. Intenta iniciar sesión con el método original.";
+        toast({ title: "Conflicto de cuenta", description: errorMessage, variant: "destructive" });
+      } else {
+        errorMessage = error.message || errorMessage;
+        toast({ title: "Error al iniciar sesión con Google", description: errorMessage, variant: "destructive" });
+      }
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -134,6 +148,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         login,
         signup,
         logout,
+        loginWithGoogle, // Added
         isLoading,
       }}
     >
@@ -142,12 +157,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
   );
 }
 
-
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  // Wrap AuthProviderInternal with React.Suspense because useSearchParams()
-  // suspends during initial render in the App Router.
   return (
-    <React.Suspense fallback={<div>Cargando autenticación...</div>}>
+    <React.Suspense fallback={<div className="flex h-screen w-screen items-center justify-center"><p>Cargando autenticación...</p></div>}>
       <AuthProviderInternal>{children}</AuthProviderInternal>
     </React.Suspense>
   );

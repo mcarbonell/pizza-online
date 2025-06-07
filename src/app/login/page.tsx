@@ -28,8 +28,20 @@ const loginFormSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
+// SVG for Google Icon
+const GoogleIcon = () => (
+  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="mr-2 h-5 w-5">
+    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
+    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+    <path fill="none" d="M0 0h48v48H0z"></path>
+  </svg>
+);
+
+
 export default function LoginPage() {
-  const { user, login, isLoading: authIsLoading } = useAuth();
+  const { user, login, loginWithGoogle, isLoading: authIsLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get('redirect') || '/profile';
@@ -50,24 +62,13 @@ export default function LoginPage() {
 
   async function onSubmit(data: LoginFormValues) {
     try {
-      // The login function in AuthContext will handle redirection on success
-      // by using the redirectPath if provided or defaulting to /profile.
-      // We no longer need to pass redirectPath to login function directly.
-      // The AuthContext's login function needs to be aware of this.
-      // For now, we assume login function pushes to /profile, and the useEffect above handles if already logged in.
       await login(data.email, data.password);
-       // If login is successful, onAuthStateChanged will update 'user' and useEffect will redirect.
-       // If a redirect param was present, AuthContext's login would ideally handle it.
-       // For now, a successful login should push to /profile (done in AuthContext),
-       // or if redirect was specified, AuthContext should use that.
-       // We will update AuthContext to handle redirectPath later if needed.
-
     } catch (error: any) {
       console.error("Login page submit error:", error);
     }
   }
 
-  if (authIsLoading) {
+  if (authIsLoading && !user) { // Show loading only if not yet redirected by useEffect
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-20rem)] py-12">
         <p className="text-lg text-muted-foreground">Cargando...</p>
@@ -75,8 +76,7 @@ export default function LoginPage() {
     );
   }
   
-  // If user is already logged in, useEffect will redirect. This is a fallback render.
-  if (user) {
+  if (user && !authIsLoading) { // If user is loaded and present, useEffect will handle redirect
      return (
       <div className="flex justify-center items-center min-h-[calc(100vh-20rem)] py-12">
         <p className="text-lg text-muted-foreground">Ya has iniciado sesión. Redirigiendo...</p>
@@ -125,6 +125,35 @@ export default function LoginPage() {
               </Button>
             </form>
           </Form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                O continúa con
+              </span>
+            </div>
+          </div>
+
+          <Button 
+            variant="outline" 
+            className="w-full text-base py-2.5" 
+            onClick={async () => {
+              try {
+                await loginWithGoogle();
+              } catch (error) {
+                // Error is typically handled in AuthContext
+                console.error("Login page Google button error:", error);
+              }
+            }}
+            disabled={authIsLoading}
+          >
+            <GoogleIcon />
+            Iniciar sesión con Google
+          </Button>
+
           <p className="mt-6 text-center text-sm text-muted-foreground">
             ¿No tienes una cuenta?{" "}
             <Button variant="link" asChild className="p-0 h-auto font-semibold text-primary">

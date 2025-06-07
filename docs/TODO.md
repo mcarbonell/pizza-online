@@ -22,8 +22,8 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
 - [x] **Protección de Rutas:**
     - [x] Proteger rutas como `/profile` y `/checkout` para que solo usuarios autenticados puedan acceder. Redirigir a `/login` si no está autenticado.
     - [x] Rutas como `/login` y `/signup` deberían redirigir a `/profile` o `/` si el usuario ya está autenticado.
-- [ ] **Autenticación de Usuarios (Firebase Auth - Fase 3 - Proveedores Sociales):**
-    - [ ] Añadir opción de inicio de sesión con Google.
+- [x] **Autenticación de Usuarios (Firebase Auth - Fase 3 - Proveedores Sociales):**
+    - [x] Añadir opción de inicio de sesión con Google.
     - [ ] Añadir opción de inicio de sesión con Facebook (opcional).
 - [ ] **Manejo de Contraseñas Avanzado (Firebase Auth):**
     - [ ] Implementar funcionalidad de "Olvidé mi contraseña" (restablecimiento de contraseña por correo).
