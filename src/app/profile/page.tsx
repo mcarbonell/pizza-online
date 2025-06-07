@@ -30,7 +30,7 @@ import 'leaflet/dist/leaflet.css';
 
 const OrderTrackingMap = dynamic(() => import('@/components/maps/OrderTrackingMap'), {
   ssr: false,
-  loading: () => <div className="h-[300px] w-full bg-muted rounded-md flex items-center justify-center my-4"><Loader2 className="animate-spin h-8 w-8 text-primary" /><p className="ml-2">Cargando mapa...</p></div>,
+  loading: () => <div className="h-[200px] w-full bg-muted rounded-md flex items-center justify-center my-4"><Loader2 className="animate-spin h-8 w-8 text-primary" /><p className="ml-2">Cargando componente de mapa...</p></div>,
 });
 
 
@@ -188,17 +188,27 @@ export default function ProfilePage() {
                           </div>
                         </CardHeader>
                         <CardContent>
+                          {/* SIMPLIFIED MAP FOR TESTING */}
+                          <div className="my-4 border-t pt-4">
+                              <h3 className="text-md font-semibold mb-2 flex items-center gap-1">
+                                <MapPin className="h-5 w-5 text-primary"/>Mapa de Prueba (Estático)
+                              </h3>
+                              {order.id && <OrderTrackingMap mapId={`map-test-${order.id}`} />}
+                          </div>
+                          
+                          {/* Original map logic commented out for testing
                           {order.status === 'Out for Delivery' && order.deliveryLocation?.latitude && order.deliveryLocation?.longitude && (
                             <div className="my-4">
                                <h3 className="text-md font-semibold mb-2 flex items-center gap-1"><MapPin className="h-5 w-5 text-primary"/>Ubicación del Repartidor (en tiempo real):</h3>
                                <OrderTrackingMap 
-                                  key={order.id} 
+                                  key={`tracking-${order.id}`}
                                   latitude={order.deliveryLocation.latitude} 
                                   longitude={order.deliveryLocation.longitude} 
                                   orderId={order.id}
                                 />
                             </div>
                            )}
+                           */}
                           <Accordion type="single" collapsible className="w-full">
                             <AccordionItem value="items"> <AccordionTrigger className="text-base font-semibold">Ver {order.items.length} Artículo(s)</AccordionTrigger>
                               <AccordionContent> <ul className="space-y-3 pt-2"> {order.items.map((item) => ( <li key={item.id} className="flex items-center justify-between gap-3 p-2 rounded-md bg-muted/20"> <div className="flex items-center gap-3"> <Image src={item.imageUrl} alt={item.name} width={40} height={40} className="rounded object-cover" data-ai-hint={item.dataAiHint}/> <div><p className="font-semibold text-sm">{item.name}</p><p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p></div> </div> <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p> </li> ))} </ul> </AccordionContent>
@@ -237,3 +247,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

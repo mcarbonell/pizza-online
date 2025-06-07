@@ -1,10 +1,12 @@
 
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer } from 'react-leaflet';
 import L, { type LatLngExpression, type Map as LeafletMap } from 'leaflet';
 import { useEffect, useState, useRef } from 'react';
+import { Loader2 } from 'lucide-react';
 
+// Default Leaflet icon fix
 const defaultIcon = L.icon({
   iconUrl: '/leaflet/marker-icon.png',
   iconRetinaUrl: '/leaflet/marker-icon-2x.png',
@@ -14,81 +16,72 @@ const defaultIcon = L.icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
+L.Marker.prototype.options.icon = defaultIcon; // Set as default for all markers
 
-interface OrderTrackingMapProps {
-  latitude: number;
-  longitude: number;
-  orderId?: string;
+interface SimplifiedOrderTrackingMapProps {
+  mapId: string; // Unique ID to help with keying and cleanup
 }
 
-function ChangeView({ center, zoom }: { center: LatLngExpression; zoom: number }) {
-  const map = useMap();
-  useEffect(() => {
-    if (map) {
-      map.setView(center, zoom);
-    }
-  }, [map, center, zoom]);
-  return null;
-}
-
-export default function OrderTrackingMap({ latitude, longitude, orderId }: OrderTrackingMapProps) {
+export default function OrderTrackingMap({ mapId }: SimplifiedOrderTrackingMapProps) {
   const [isClient, setIsClient] = useState(false);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
+  const fixedPosition: LatLngExpression = [40.416775, -3.703790]; // Madrid
 
   useEffect(() => {
-    setIsClient(true); // Ensures MapContainer renders only on client
-  }, []);
+    setIsClient(true);
+    // console.log(`OrderTrackingMap for ${mapId} MOUNTED, isClient set to true.`);
+  }, [mapId]);
 
-  // Cleanup effect: runs when component unmounts or orderId changes
+  // Cleanup effect: runs when component unmounts or mapId changes (if mapId prop changes)
   useEffect(() => {
-    // This function will be called when the component is unmounted
-    // or when orderId changes (meaning the previous map instance needs cleanup)
+    const currentMapInstance = mapInstanceRef.current;
+    // console.log(`Cleanup effect for ${mapId} BEGINS. Current map instance:`, currentMapInstance);
     return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null; // Clear the ref
-        console.log(`Leaflet map instance for order ${orderId || ''} EXPLICITLY REMOVED.`);
+      if (currentMapInstance) {
+        // console.log(`Leaflet map instance for mapId ${mapId} CLEANUP - REMOVING...`);
+        currentMapInstance.remove();
+        // mapInstanceRef.current = null; // Avoid setting ref from cleanup of stale closure
+        // console.log(`Leaflet map instance for mapId ${mapId} CLEANUP - REMOVED.`);
+      } else {
+        // console.log(`Leaflet map instance for mapId ${mapId} CLEANUP - No map instance to remove.`);
       }
     };
-  }, [orderId]); // Key dependency: ensures cleanup for the specific order's map
+  }, [mapId]); // Re-run cleanup if mapId changes, ensuring old one is cleaned.
 
   if (!isClient) {
-    return <div className="h-[300px] w-full bg-muted rounded-md flex items-center justify-center"><p>Cargando mapa...</p></div>;
+    return (
+      <div className="h-[200px] w-full bg-muted rounded-md flex items-center justify-center my-2">
+        <Loader2 className="animate-spin h-6 w-6 text-primary" />
+        <p className="ml-2 text-sm">Cargando mapa...</p>
+      </div>
+    );
   }
-  
-  if (!latitude || !longitude) {
-    return <div className="h-[300px] w-full bg-muted rounded-md flex items-center justify-center"><p>Esperando ubicación del repartidor...</p></div>;
-  }
-  
-  const position: LatLngExpression = [latitude, longitude];
 
+  // console.log(`Rendering MapContainer for mapId: ${mapId}`);
   return (
-    <MapContainer
-      center={position}
-      zoom={16}
-      style={{ height: '300px', width: '100%' }}
-      className="rounded-md shadow-md my-4 z-0"
-      whenCreated={(mapInstance) => {
-        // If there's an old map instance in the ref (e.g. from a HMR or race condition), remove it first
-        if (mapInstanceRef.current && mapInstanceRef.current !== mapInstance) {
+    <div style={{ height: '200px', width: '100%' }} className="my-2 rounded-md overflow-hidden shadow-md border">
+      <MapContainer
+        key={mapId} // Critical: Force re-render if mapId changes
+        center={fixedPosition}
+        zoom={10}
+        style={{ height: '100%', width: '100%' }}
+        className="z-0" // Ensure z-index is lower than other page elements if needed
+        whenCreated={(mapInstance) => {
+          // console.log(`Leaflet map instance for mapId ${mapId} CREATED.`);
+          // If there's an old map instance in the ref from a previous render (e.g. HMR, or if key didn't fully prevent reuse)
+          if (mapInstanceRef.current && mapInstanceRef.current !== mapInstance) {
+            // console.warn(`PRE-CLEANUP: Stale Leaflet map instance for mapId ${mapId} being removed before assigning new one.`);
             mapInstanceRef.current.remove();
-            console.log(`PRE-CLEANUP: Stale Leaflet map instance for order ${orderId || ''} removed before new creation.`);
-        }
-        mapInstanceRef.current = mapInstance;
-        console.log(`Leaflet map instance for order ${orderId || ''} created and assigned to ref.`);
-      }}
-    >
-      <ChangeView center={position} zoom={16} />
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <Marker position={position} icon={defaultIcon}>
-        <Popup>
-          {orderId ? `Repartidor del pedido #${orderId.substring(0,8)}...` : 'Ubicación del repartidor'}
-        </Popup>
-      </Marker>
-    </MapContainer>
+          }
+          mapInstanceRef.current = mapInstance;
+        }}
+        preferCanvas={true} // May help with some rendering issues/performance
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+      </MapContainer>
+    </div>
   );
 }
-
