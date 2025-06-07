@@ -22,14 +22,11 @@ export interface ShippingAddressDetails {
   phone?: string;
 }
 
-// Simulated payment details for storage (non-sensitive parts)
 export interface SimulatedPaymentMethod {
   last4Digits: string;
   expiryDate: string; // MM/YY
-  // cardBrand?: string; // Optional: could add logic to determine brand
 }
 
-// Full payment details for form submission (still simulated)
 export interface PaymentDetails {
   cardNumber: string; 
   expiryDate: string; 
@@ -40,6 +37,8 @@ export interface User {
   uid: string;        
   email: string | null; 
   displayName?: string | null; 
+  // Firebase User object also has providerData
+  providerData?: Array<{ providerId: string }>;
 }
 
 export interface UserProfile {
@@ -47,7 +46,7 @@ export interface UserProfile {
   email: string | null;
   displayName?: string | null;
   defaultShippingAddress?: ShippingAddressDetails | null; 
-  defaultPaymentMethod?: SimulatedPaymentMethod | null; // Added
+  defaultPaymentMethod?: SimulatedPaymentMethod | null;
   createdAt: any; 
   updatedAt: any; 
 }
@@ -58,7 +57,20 @@ export interface Order {
   items: CartItem[];
   totalAmount: number;
   shippingAddress: ShippingAddressDetails; 
-  paymentDetails: PaymentDetails; 
+  paymentDetails: PaymentDetails; // For order record, it's still PaymentDetails
   createdAt: any; 
   status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
+}
+
+// Schema for the edit profile form
+export interface UpdateUserProfileFormValues {
+  displayName: string;
+  shippingName: string;
+  shippingEmail: string;
+  shippingAddress: string;
+  shippingCity: string;
+  shippingPostalCode: string;
+  shippingPhone?: string;
+  paymentLast4Digits: string;
+  paymentExpiryDate: string;
 }

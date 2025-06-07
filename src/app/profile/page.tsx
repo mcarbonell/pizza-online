@@ -6,10 +6,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, CreditCardIcon, KeyRound } from 'lucide-react';
+import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, CreditCardIcon, KeyRound, AlertTriangle } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import type { Order } from '@/lib/types'; 
+import type { Order, UpdateUserProfileFormValues, ShippingAddressDetails, SimulatedPaymentMethod } from '@/lib/types'; 
 import Image from 'next/image';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +20,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
-
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "La contraseña actual es requerida."),
@@ -30,23 +31,77 @@ const changePasswordSchema = z.object({
   message: "Las nuevas contraseñas no coinciden.",
   path: ["confirmNewPassword"], 
 });
-
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
+const updateUserProfileSchema = z.object({
+  displayName: z.string().min(2, "El nombre debe tener al menos 2 caracteres.").max(50, "El nombre no puede exceder los 50 caracteres."),
+  
+  shippingName: z.string().min(2, "El nombre para envío es requerido.").optional().or(z.literal('')),
+  shippingEmail: z.string().email("Introduce un email de envío válido.").optional().or(z.literal('')),
+  shippingAddress: z.string().min(5, "La dirección de envío es requerida.").optional().or(z.literal('')),
+  shippingCity: z.string().min(2, "La ciudad de envío es requerida.").optional().or(z.literal('')),
+  shippingPostalCode: z.string().min(3, "El código postal de envío es requerido.").optional().or(z.literal('')),
+  shippingPhone: z.string().optional().or(z.literal('')),
+
+  paymentLast4Digits: z.string()
+    .length(4, "Los últimos 4 dígitos deben ser 4 números.")
+    .regex(/^\d{4}$/, "Debe contener solo 4 números.")
+    .optional().or(z.literal('')),
+  paymentExpiryDate: z.string()
+    .regex(/^(0[1-9]|1[0-2])\/\d{2}$/, "La fecha de caducidad debe ser MM/AA.")
+    .optional().or(z.literal('')),
+}).refine(data => { // Conditional validation: if one shipping field is present, all main ones are required
+  const shippingFields = [data.shippingName, data.shippingEmail, data.shippingAddress, data.shippingCity, data.shippingPostalCode];
+  const paymentFields = [data.paymentLast4Digits, data.paymentExpiryDate];
+
+  const someShippingPresent = shippingFields.some(field => field && field.length > 0);
+  const allRequiredShippingPresent = data.shippingName && data.shippingEmail && data.shippingAddress && data.shippingCity && data.shippingPostalCode;
+
+  const somePaymentPresent = paymentFields.some(field => field && field.length > 0);
+  const allRequiredPaymentPresent = data.paymentLast4Digits && data.paymentExpiryDate;
+  
+  if (someShippingPresent && !allRequiredShippingPresent) return false;
+  if (somePaymentPresent && !allRequiredPaymentPresent) return false;
+  
+  return true;
+}, {
+  message: "Si se proporciona un detalle de envío o pago, todos sus campos principales son requeridos (excepto teléfono de envío).",
+  path: ["shippingName"], // Path to one of the fields to show general error
+});
+
+type UpdateUserProfileFormValuesZod = z.infer<typeof updateUserProfileSchema>;
+
+
 export default function ProfilePage() {
-  const { user, userProfile, logout, updateUserPassword, isLoading: authIsLoading, isLoadingUserProfile } = useAuth(); 
+  const { 
+    user, 
+    userProfile, 
+    logout, 
+    updateUserPassword, 
+    updateUserProfileDetails,
+    isLoading: authIsLoading, 
+    isLoadingUserProfile 
+  } = useAuth(); 
   const router = useRouter();
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isEditProfileDialogOpen, setIsEditProfileDialogOpen] = useState(false);
+
+  const hasPasswordProvider = user?.providerData?.some(p => p.providerId === 'password');
 
   const passwordForm = useForm<ChangePasswordFormValues>({
     resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmNewPassword: "" },
+  });
+
+  const editProfileForm = useForm<UpdateUserProfileFormValuesZod>({
+    resolver: zodResolver(updateUserProfileSchema),
     defaultValues: {
-      currentPassword: "",
-      newPassword: "",
-      confirmNewPassword: "",
+      displayName: "",
+      shippingName: "", shippingEmail: "", shippingAddress: "", shippingCity: "", shippingPostalCode: "", shippingPhone: "",
+      paymentLast4Digits: "", paymentExpiryDate: ""
     },
   });
 
@@ -55,6 +110,23 @@ export default function ProfilePage() {
       router.push('/login?redirect=/profile');
     }
   }, [user, authIsLoading, router]);
+  
+  useEffect(() => {
+    if (userProfile && !editProfileForm.formState.isDirty) {
+      editProfileForm.reset({
+        displayName: userProfile.displayName || "",
+        shippingName: userProfile.defaultShippingAddress?.name || "",
+        shippingEmail: userProfile.defaultShippingAddress?.email || "",
+        shippingAddress: userProfile.defaultShippingAddress?.address || "",
+        shippingCity: userProfile.defaultShippingAddress?.city || "",
+        shippingPostalCode: userProfile.defaultShippingAddress?.postalCode || "",
+        shippingPhone: userProfile.defaultShippingAddress?.phone || "",
+        paymentLast4Digits: userProfile.defaultPaymentMethod?.last4Digits || "",
+        paymentExpiryDate: userProfile.defaultPaymentMethod?.expiryDate || "",
+      });
+    }
+  }, [userProfile, editProfileForm, isEditProfileDialogOpen]);
+
 
   useEffect(() => {
     if (user?.uid) {
@@ -85,10 +157,31 @@ export default function ProfilePage() {
       passwordForm.reset();
       setIsPasswordDialogOpen(false); 
     } catch (error) {
-      // Error toast is handled in AuthContext, form remains open
       console.error("Failed to change password from profile page", error)
     }
   }
+
+  async function onSubmitEditProfile(data: UpdateUserProfileFormValuesZod) {
+    // Map Zod schema to the type expected by AuthContext
+    const mappedData: UpdateUserProfileFormValues = {
+      displayName: data.displayName,
+      shippingName: data.shippingName || '',
+      shippingEmail: data.shippingEmail || '',
+      shippingAddress: data.shippingAddress || '',
+      shippingCity: data.shippingCity || '',
+      shippingPostalCode: data.shippingPostalCode || '',
+      shippingPhone: data.shippingPhone || '',
+      paymentLast4Digits: data.paymentLast4Digits || '',
+      paymentExpiryDate: data.paymentExpiryDate || '',
+    };
+    try {
+      await updateUserProfileDetails(mappedData);
+      setIsEditProfileDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to update profile from profile page", error);
+    }
+  }
+
 
   if (authIsLoading || isLoadingUserProfile || !user) { 
     return (
@@ -97,10 +190,6 @@ export default function ProfilePage() {
       </div>
     );
   }
-
-  const handleLogout = async () => {
-    await logout();
-  };
 
   const formatDate = (timestamp: any) => {
     if (timestamp && timestamp.toDate) {
@@ -130,15 +219,6 @@ export default function ProfilePage() {
                   <p className="text-md font-semibold">{userProfile.email}</p>
                 </div>
               </div>
-            )}
-            {userProfile?.displayName && (
-                 <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                    <UserCircle className="h-5 w-5 text-primary" />
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground">Nombre</p>
-                        <p className="text-md font-semibold">{userProfile.displayName}</p>
-                    </div>
-                </div>
             )}
              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
                 <UserCircle className="h-5 w-5 text-primary" /> 
@@ -175,80 +255,113 @@ export default function ProfilePage() {
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-            <Button variant="outline" disabled>
-              <Edit3 /> Editar Perfil, Dirección y Pago (Próximamente)
-            </Button>
+            <Dialog open={isEditProfileDialogOpen} onOpenChange={setIsEditProfileDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button variant="outline">
+                        <Edit3 /> Editar Perfil y Preferencias
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg max-h-[90vh]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2"><Edit3/> Editar Perfil</DialogTitle>
+                        <DialogDescription>
+                            Actualiza tu nombre, dirección de envío predeterminada y método de pago simulado.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <ScrollArea className="max-h-[60vh] p-1 pr-5">
+                    <Form {...editProfileForm}>
+                        <form onSubmit={editProfileForm.handleSubmit(onSubmitEditProfile)} className="space-y-6 py-4">
+                            {/* Display Name */}
+                            <FormField
+                                control={editProfileForm.control}
+                                name="displayName"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Nombre Público</FormLabel>
+                                        <FormControl><Input placeholder="Tu nombre" {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <Accordion type="multiple" className="w-full" defaultValue={['shipping', 'payment']}>
+                                <AccordionItem value="shipping">
+                                    <AccordionTrigger className="text-lg font-semibold">Dirección de Envío Predeterminada</AccordionTrigger>
+                                    <AccordionContent className="space-y-4 pt-4">
+                                        <FormField control={editProfileForm.control} name="shippingName" render={({ field }) => ( <FormItem> <FormLabel>Nombre del destinatario</FormLabel> <FormControl><Input placeholder="Nombre completo" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                        <FormField control={editProfileForm.control} name="shippingEmail" render={({ field }) => ( <FormItem> <FormLabel>Email de contacto</FormLabel> <FormControl><Input type="email" placeholder="email@ejemplo.com" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                        <FormField control={editProfileForm.control} name="shippingAddress" render={({ field }) => ( <FormItem> <FormLabel>Dirección</FormLabel> <FormControl><Input placeholder="Calle, Número, etc." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                        <div className="grid grid-cols-2 gap-4">
+                                          <FormField control={editProfileForm.control} name="shippingCity" render={({ field }) => ( <FormItem> <FormLabel>Ciudad</FormLabel> <FormControl><Input placeholder="Ciudad" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                          <FormField control={editProfileForm.control} name="shippingPostalCode" render={({ field }) => ( <FormItem> <FormLabel>Código Postal</FormLabel> <FormControl><Input placeholder="C.P." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                        </div>
+                                        <FormField control={editProfileForm.control} name="shippingPhone" render={({ field }) => ( <FormItem> <FormLabel>Teléfono (Opcional)</FormLabel> <FormControl><Input placeholder="Número de teléfono" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                    </AccordionContent>
+                                </AccordionItem>
+                                <AccordionItem value="payment">
+                                    <AccordionTrigger className="text-lg font-semibold">Pago Predeterminado (Simulado)</AccordionTrigger>
+                                    <AccordionContent className="space-y-4 pt-4">
+                                        <FormField control={editProfileForm.control} name="paymentLast4Digits" render={({ field }) => ( <FormItem> <FormLabel>Últimos 4 dígitos de la tarjeta</FormLabel> <FormControl><Input placeholder="1234" {...field} maxLength={4} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                        <FormField control={editProfileForm.control} name="paymentExpiryDate" render={({ field }) => ( <FormItem> <FormLabel>Fecha de caducidad (MM/AA)</FormLabel> <FormControl><Input placeholder="MM/AA" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            </Accordion>
+                             <DialogFooter className="mt-6">
+                                <DialogClose asChild><Button type="button" variant="ghost">Cancelar</Button></DialogClose>
+                                <Button type="submit" disabled={editProfileForm.formState.isSubmitting || authIsLoading}>
+                                    {editProfileForm.formState.isSubmitting || authIsLoading ? 'Guardando...' : 'Guardar Cambios'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
+                    </ScrollArea>
+                </DialogContent>
+            </Dialog>
             
             <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <ShieldCheck /> Cambiar Contraseña
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2"><KeyRound/> Cambiar Contraseña</DialogTitle>
-                  <DialogDescription>
-                    Introduce tu contraseña actual y la nueva contraseña.
-                  </DialogDescription>
-                </DialogHeader>
-                <Form {...passwordForm}>
-                  <form onSubmit={passwordForm.handleSubmit(onSubmitPasswordChange)} className="space-y-4 py-4">
-                    <FormField
-                      control={passwordForm.control}
-                      name="currentPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contraseña Actual</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="••••••••" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={passwordForm.control}
-                      name="newPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nueva Contraseña</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="••••••••" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={passwordForm.control}
-                      name="confirmNewPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Confirmar Nueva Contraseña</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="••••••••" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button type="button" variant="ghost">Cancelar</Button>
-                      </DialogClose>
-                      <Button type="submit" disabled={passwordForm.formState.isSubmitting || authIsLoading}>
-                        {passwordForm.formState.isSubmitting || authIsLoading ? 'Actualizando...' : 'Actualizar Contraseña'}
+              <TooltipProvider>
+                <Tooltip open={!hasPasswordProvider ? undefined : false }>
+                  <TooltipTrigger asChild>
+                    {/* The button needs to be wrapped for TooltipTrigger when disabled */}
+                    <span tabIndex={hasPasswordProvider ? -1 : 0}> 
+                      <Button variant="outline" disabled={!hasPasswordProvider} onClick={() => hasPasswordProvider && setIsPasswordDialogOpen(true)}>
+                        <ShieldCheck /> Cambiar Contraseña
                       </Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
+                    </span>
+                  </TooltipTrigger>
+                  {!hasPasswordProvider && (
+                    <TooltipContent>
+                      <p className="flex items-center gap-1"><AlertTriangle className="h-4 w-4 text-amber-500" />No puedes cambiar la contraseña porque iniciaste sesión con un proveedor externo (ej. Google).</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+
+              {hasPasswordProvider && (
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2"><KeyRound/> Cambiar Contraseña</DialogTitle>
+                    <DialogDescription>Introduce tu contraseña actual y la nueva contraseña.</DialogDescription>
+                  </DialogHeader>
+                  <Form {...passwordForm}>
+                    <form onSubmit={passwordForm.handleSubmit(onSubmitPasswordChange)} className="space-y-4 py-4">
+                      <FormField control={passwordForm.control} name="currentPassword" render={({ field }) => ( <FormItem> <FormLabel>Contraseña Actual</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                      <FormField control={passwordForm.control} name="newPassword" render={({ field }) => ( <FormItem> <FormLabel>Nueva Contraseña</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                      <FormField control={passwordForm.control} name="confirmNewPassword" render={({ field }) => ( <FormItem> <FormLabel>Confirmar Nueva Contraseña</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                      <DialogFooter>
+                        <DialogClose asChild><Button type="button" variant="ghost">Cancelar</Button></DialogClose>
+                        <Button type="submit" disabled={passwordForm.formState.isSubmitting || authIsLoading}>
+                          {passwordForm.formState.isSubmitting || authIsLoading ? 'Actualizando...' : 'Actualizar Contraseña'}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </Form>
+                </DialogContent>
+              )}
             </Dialog>
 
           </div>
 
-          <Button onClick={handleLogout} variant="destructive" className="w-full mt-6" disabled={authIsLoading}>
+          <Button onClick={logout} variant="destructive" className="w-full mt-6" disabled={authIsLoading}>
             <LogOut />
             {authIsLoading ? 'Cerrando sesión...' : 'Cerrar Sesión'}
           </Button>
@@ -260,16 +373,12 @@ export default function ProfilePage() {
           <ShoppingBag /> Mis Pedidos
         </h2>
         {isLoadingOrders ? (
-          <div className="text-center py-10">
-            <p className="text-lg text-muted-foreground">Cargando tus pedidos...</p>
-          </div>
+          <div className="text-center py-10"><p className="text-lg text-muted-foreground">Cargando tus pedidos...</p></div>
         ) : orders.length === 0 ? (
           <div className="text-center py-10">
             <Package className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
             <p className="text-lg text-muted-foreground">Aún no has realizado ningún pedido.</p>
-            <Button asChild variant="link" className="mt-4 text-primary">
-              <a href="/">Ir al Menú</a>
-            </Button>
+            <Button asChild variant="link" className="mt-4 text-primary"><Link href="/">Ir al Menú</Link></Button>
           </div>
         ) : (
           <div className="space-y-6">
@@ -285,34 +394,20 @@ export default function ProfilePage() {
                         <CalendarDays className="h-4 w-4" /> {formatDate(order.createdAt)}
                       </CardDescription>
                     </div>
-                    <Badge variant={order.status === 'Pending' ? 'secondary' : 'default'} className="mt-1">
-                      {order.status}
-                    </Badge>
+                    <Badge variant={order.status === 'Pending' ? 'secondary' : 'default'} className="mt-1">{order.status}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="items">
-                      <AccordionTrigger className="text-base font-semibold">
-                        Ver {order.items.length} Artículo(s)
-                      </AccordionTrigger>
+                      <AccordionTrigger className="text-base font-semibold">Ver {order.items.length} Artículo(s)</AccordionTrigger>
                       <AccordionContent>
                         <ul className="space-y-3 pt-2">
                           {order.items.map((item) => (
                             <li key={item.id} className="flex items-center justify-between gap-3 p-2 rounded-md bg-muted/20">
                               <div className="flex items-center gap-3">
-                                <Image
-                                  src={item.imageUrl}
-                                  alt={item.name}
-                                  width={40}
-                                  height={40}
-                                  className="rounded object-cover"
-                                  data-ai-hint={item.dataAiHint}
-                                />
-                                <div>
-                                  <p className="font-semibold text-sm">{item.name}</p>
-                                  <p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p>
-                                </div>
+                                <Image src={item.imageUrl} alt={item.name} width={40} height={40} className="rounded object-cover" data-ai-hint={item.dataAiHint}/>
+                                <div><p className="font-semibold text-sm">{item.name}</p><p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p></div>
                               </div>
                               <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p>
                             </li>
@@ -321,9 +416,7 @@ export default function ProfilePage() {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="shipping">
-                      <AccordionTrigger className="text-base font-semibold">
-                        Detalles de Envío
-                      </AccordionTrigger>
+                      <AccordionTrigger className="text-base font-semibold">Detalles de Envío</AccordionTrigger>
                       <AccordionContent className="text-sm space-y-1 pt-2">
                         <p><strong>Nombre:</strong> {order.shippingAddress.name}</p>
                         <p><strong>Email:</strong> {order.shippingAddress.email}</p>
@@ -334,10 +427,7 @@ export default function ProfilePage() {
                   </Accordion>
                 </CardContent>
                 <CardFooter className="bg-muted/30 p-4 rounded-b-lg flex justify-end items-center">
-                  <div className="flex items-center gap-1.5 text-lg font-bold text-primary">
-                    <DollarSign className="h-5 w-5" />
-                    Total: ${order.totalAmount.toFixed(2)}
-                  </div>
+                  <div className="flex items-center gap-1.5 text-lg font-bold text-primary"><DollarSign className="h-5 w-5" />Total: ${order.totalAmount.toFixed(2)}</div>
                 </CardFooter>
               </Card>
             ))}
@@ -347,4 +437,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

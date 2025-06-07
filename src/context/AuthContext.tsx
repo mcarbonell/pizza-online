@@ -1,10 +1,10 @@
 
 "use client";
 
-import type { User, UserProfile } from '@/lib/types';
+import type { User, UserProfile, UpdateUserProfileFormValues, ShippingAddressDetails, SimulatedPaymentMethod } from '@/lib/types';
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { auth, googleProvider, db } from '@/lib/firebase'; // Import db
+import { auth, googleProvider, db } from '@/lib/firebase';
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
@@ -18,7 +18,7 @@ import {
   updatePassword as firebaseUpdatePassword,
   type User as FirebaseUser
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'; 
+import { doc, setDoc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore'; 
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
@@ -31,6 +31,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserPassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  updateUserProfileDetails: (data: UpdateUserProfileFormValues) => Promise<void>;
   isLoading: boolean;
   fetchUserProfile: (uid: string) => Promise<void>; 
 }
@@ -74,8 +75,8 @@ const createUserProfileDocument = async (firebaseUser: FirebaseUser) => {
     }
   } else {
     const existingData = userSnap.data() as UserProfile;
-    let needsUpdate = false;
     const updates: Partial<UserProfile> = { updatedAt: serverTimestamp() };
+    let needsUpdate = false;
 
     if (firebaseUser.displayName && existingData.displayName !== firebaseUser.displayName) {
         updates.displayName = firebaseUser.displayName;
@@ -88,7 +89,7 @@ const createUserProfileDocument = async (firebaseUser: FirebaseUser) => {
 
     if (needsUpdate) {
       try {
-        await setDoc(userRef, updates, { merge: true });
+        await updateDoc(userRef, updates);
         console.log("User profile document updated for user:", firebaseUser.uid);
       } catch (error) {
         console.error("Error updating user profile document:", error);
@@ -116,6 +117,8 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         setUserProfile(docSnap.data() as UserProfile);
       } else {
         console.log("No user profile found in Firestore for UID:", uid);
+        // Potentially create it here if it's absolutely missing post-login/signup
+        // For now, we assume createUserProfileDocument handles initial creation.
         setUserProfile(null); 
       }
     } catch (error) {
@@ -127,15 +130,15 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     }
   };
 
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      setIsLoading(true); // Set loading true at the start of auth state change
+      setIsLoading(true);
       if (firebaseUser) {
-        const simpleUser = {
+        const simpleUser: User = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
+          providerData: firebaseUser.providerData.map(pd => ({ providerId: pd.providerId })),
         };
         setUser(simpleUser);
         await createUserProfileDocument(firebaseUser); 
@@ -143,9 +146,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       } else {
         setUser(null);
         setUserProfile(null);
-        setIsLoadingUserProfile(false); // Ensure this is false if no user
+        setIsLoadingUserProfile(false);
       }
-      setIsLoading(false); // Set loading false at the end
+      setIsLoading(false); 
     });
     return () => unsubscribe();
   }, []);
@@ -155,7 +158,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
-        await fetchUserProfile(userCredential.user.uid); 
+        // onAuthStateChanged will handle setting user and fetching profile
       }
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
@@ -163,8 +166,6 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } catch (error: any) {
       console.error("Error during login:", error);
       toast({ title: "Error al iniciar sesión", description: error.message || "Por favor, revisa tus credenciales.", variant: "destructive" });
-      setUser(null);
-      setUserProfile(null);
     } finally {
       setIsLoading(false);
     }
@@ -174,11 +175,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      if (userCredential.user) {
-        if (name) {
+      if (userCredential.user && name) {
           await updateFirebaseProfile(userCredential.user, { displayName: name });
-        }
-        // createUserProfileDocument will be called by onAuthStateChanged
+          // Firestore document will be updated/created by onAuthStateChanged logic
       }
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
@@ -186,8 +185,6 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } catch (error: any) {
       console.error("Error during signup:", error);
       toast({ title: "Error al registrarse", description: error.message || "No se pudo crear la cuenta.", variant: "destructive" });
-      setUser(null);
-      setUserProfile(null);
     } finally {
       setIsLoading(false);
     }
@@ -197,12 +194,13 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     setIsLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      // createUserProfileDocument and fetchUserProfile will be called by onAuthStateChanged
+      // onAuthStateChanged will handle setting user and fetching profile
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Inicio de sesión con Google exitoso", description: `¡Bienvenido, ${result.user.displayName || result.user.email}!` });
     } catch (error: any) {
       console.error("Error during Google login:", error);
+      // Error handling logic...
       let errorMessage = "No se pudo iniciar sesión con Google.";
       if (error.code === 'auth/popup-closed-by-user') {
         errorMessage = "El proceso de inicio de sesión con Google fue cancelado.";
@@ -214,8 +212,6 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         errorMessage = error.message || errorMessage;
         toast({ title: "Error al iniciar sesión con Google", description: errorMessage, variant: "destructive" });
       }
-      setUser(null);
-      setUserProfile(null);
     } finally {
       setIsLoading(false);
     }
@@ -225,8 +221,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     setIsLoading(true);
     try {
       await signOut(auth);
-      setUser(null);
-      setUserProfile(null);
+      // onAuthStateChanged will set user and userProfile to null
       router.push('/');
       toast({ title: "Cierre de sesión exitoso", description: "Has cerrado sesión correctamente." });
     } catch (error: any) {
@@ -281,12 +276,67 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         errorMessage = "La nueva contraseña es demasiado débil.";
       }
       toast({ title: "Error al actualizar contraseña", description: errorMessage, variant: "destructive" });
-      throw error; // Re-throw para que el formulario pueda manejar el estado de envío
+      throw error; 
     } finally {
       setIsLoading(false);
     }
   };
 
+  const updateUserProfileDetails = async (data: UpdateUserProfileFormValues) => {
+    setIsLoading(true);
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) {
+      toast({ title: "Error", description: "Debes estar autenticado.", variant: "destructive" });
+      setIsLoading(false);
+      throw new Error("User not authenticated");
+    }
+
+    try {
+      // Update Firebase Auth display name if changed
+      if (data.displayName !== firebaseUser.displayName) {
+        await updateFirebaseProfile(firebaseUser, { displayName: data.displayName });
+      }
+
+      // Prepare Firestore updates
+      const userRef = doc(db, "users", firebaseUser.uid);
+      const updates: Partial<UserProfile> = {
+        displayName: data.displayName,
+        updatedAt: serverTimestamp(),
+      };
+
+      const newShippingAddress: ShippingAddressDetails = {
+        name: data.shippingName,
+        email: data.shippingEmail,
+        address: data.shippingAddress,
+        city: data.shippingCity,
+        postalCode: data.shippingPostalCode,
+        phone: data.shippingPhone || '',
+      };
+      updates.defaultShippingAddress = newShippingAddress;
+      
+      if (data.paymentLast4Digits && data.paymentExpiryDate) {
+        const newPaymentMethod: SimulatedPaymentMethod = {
+            last4Digits: data.paymentLast4Digits.slice(-4), // Ensure only last 4
+            expiryDate: data.paymentExpiryDate,
+        };
+        updates.defaultPaymentMethod = newPaymentMethod;
+      } else {
+        updates.defaultPaymentMethod = null; // Clear if fields are empty
+      }
+
+
+      await updateDoc(userRef, updates);
+      await fetchUserProfile(firebaseUser.uid); // Refresh local profile state
+
+      toast({ title: "Perfil Actualizado", description: "Tu información ha sido actualizada correctamente." });
+    } catch (error: any) {
+      console.error("Error updating user profile details:", error);
+      toast({ title: "Error al Actualizar Perfil", description: error.message || "No se pudo actualizar tu información.", variant: "destructive" });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <AuthContext.Provider
@@ -300,6 +350,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         loginWithGoogle,
         resetPassword,
         updateUserPassword,
+        updateUserProfileDetails,
         isLoading,
         fetchUserProfile,
       }}
@@ -316,4 +367,3 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     </React.Suspense>
   );
 };
-

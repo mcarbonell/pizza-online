@@ -36,6 +36,10 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
     - [x] Guardar pedidos en Firestore al completar el checkout.
     - [x] Página para que los usuarios vean sus pedidos anteriores (requiere backend o Firestore).
     - [x] Detalles de cada pedido.
+- [x] **Edición de Perfil de Usuario:**
+    - [x] Permitir al usuario editar su nombre (`displayName`) desde el perfil.
+    - [x] Permitir al usuario editar/establecer su dirección de envío predeterminada desde el perfil.
+    - [x] Permitir al usuario editar/establecer su método de pago simulado predeterminado desde el perfil.
 - [ ] **Panel de Administración:**
     - [ ] CRUD para productos (Pizzas, Acompañamientos, Bebidas, Postres) - podría usar Firestore.
     - [ ] Gestión de categorías de productos.
