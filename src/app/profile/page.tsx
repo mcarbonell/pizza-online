@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useRef } from 'react'; // useRef is already imported
+import { useEffect, useState, useRef } from 'react'; 
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, KeyRound, AlertTriangle, MailCheck, MailWarning, ListOrdered, UserCog, Loader2 } from 'lucide-react'; 
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
-import type { Order, UpdateUserProfileFormValues, ShippingAddressDetails } from '@/lib/types'; 
+import type { Order, UpdateUserProfileFormValues, ShippingAddressDetails, SimulatedPaymentMethod } from '@/lib/types'; 
 import Image from 'next/image';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
@@ -84,7 +84,7 @@ export default function ProfilePage() {
   const [isEditProfileDialogOpen, setIsEditProfileDialogOpen] = useState(false);
   
   const initialDataLoadedRef = useRef(false);
-  const prevOrdersRef = useRef<Order[]>([]); // Ref to store previous orders
+  const prevOrdersRef = useRef<Order[]>([]); 
 
   const hasPasswordProvider = user?.providerData?.some(p => p.providerId === 'password');
 
@@ -126,7 +126,6 @@ export default function ProfilePage() {
     }
   }, [userProfile, user, editProfileForm, isEditProfileDialogOpen]);
 
-  // Update prevOrdersRef after orders state changes
   useEffect(() => {
     prevOrdersRef.current = orders;
   }, [orders]);
@@ -136,13 +135,11 @@ export default function ProfilePage() {
       setOrders([]);
       setIsLoadingOrders(false);
       initialDataLoadedRef.current = false; 
-      prevOrdersRef.current = []; // Reset prevOrdersRef as well
+      prevOrdersRef.current = []; 
       return;
     }
 
     setIsLoadingOrders(true);
-    // Reset initialDataLoadedRef for new user subscriptions
-    // It's important this is false before the first snapshot for a new user
     initialDataLoadedRef.current = false; 
     
     const ordersQuery = query(
@@ -154,7 +151,6 @@ export default function ProfilePage() {
     const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
       const fetchedOrders: Order[] = snapshot.docs.map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as Order));
       
-      // Use the snapshot of prevOrdersRef from *before* this update
       const currentPrevOrders = prevOrdersRef.current;
 
       if (initialDataLoadedRef.current) {
@@ -177,7 +173,7 @@ export default function ProfilePage() {
         initialDataLoadedRef.current = true;
       }
 
-      setOrders(fetchedOrders); // This will trigger the useEffect that updates prevOrdersRef.current
+      setOrders(fetchedOrders); 
       setIsLoadingOrders(false);
     }, (error) => {
       console.error("Error fetching orders with onSnapshot: ", error);
@@ -192,9 +188,9 @@ export default function ProfilePage() {
     return () => {
       unsubscribe();
       initialDataLoadedRef.current = false; 
-      prevOrdersRef.current = []; // Clean up on unmount or user change
+      prevOrdersRef.current = []; 
     };
-  }, [user?.uid, toast]); // Removed 'orders' from dependencies
+  }, [user?.uid, toast]); 
 
 
   async function onSubmitPasswordChange(data: ChangePasswordFormValues) {
@@ -243,6 +239,25 @@ export default function ProfilePage() {
       });
     }
     return 'Fecha no disponible';
+  };
+
+  const getOrderStatusBadgeClass = (status: Order['status']) => {
+    switch (status) {
+      case 'Pending':
+        return 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100';
+      case 'Processing':
+        return 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-100';
+      case 'Shipped':
+        return 'bg-cyan-100 text-cyan-800 border-cyan-300 hover:bg-cyan-100';
+      case 'Delivered':
+        return 'bg-green-100 text-green-800 border-green-300 hover:bg-green-100';
+      case 'Cancelled':
+        return 'bg-red-100 text-red-800 border-red-300 hover:bg-red-100';
+      case 'PaymentFailed':
+        return 'bg-rose-100 text-rose-800 border-rose-300 hover:bg-rose-100';
+      default:
+        return 'bg-muted text-muted-foreground border-border hover:bg-muted';
+    }
   };
 
   return (
@@ -444,7 +459,7 @@ export default function ProfilePage() {
                                 <CalendarDays className="h-4 w-4" /> {formatDate(order.createdAt)}
                               </CardDescription>
                             </div>
-                            <Badge variant={order.status === 'Pending' ? 'secondary' : 'default'} className="mt-1">{order.status}</Badge>
+                            <Badge variant="outline" className={getOrderStatusBadgeClass(order.status)}>{order.status}</Badge>
                           </div>
                         </CardHeader>
                         <CardContent>
