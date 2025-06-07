@@ -3,16 +3,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import type { CartItem, ShippingAddressDetails } from '@/lib/types';
 
-// Ensure this path is correct for your project structure
-// import { absoluteUrl } from '@/lib/utils'; // If you have a helper for absolute URLs
-
-// Function to get base URL (adapt as needed, Vercel provides NEXT_PUBLIC_VERCEL_URL)
+// Function to get base URL
 const getBaseUrl = () => {
+  // 1. Use NEXT_PUBLIC_SITE_URL if explicitly set (ideal for Cloud Workstations, Gitpod, etc.)
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    // Ensure it starts with http:// or https://
+    if (process.env.NEXT_PUBLIC_SITE_URL.startsWith('http://') || process.env.NEXT_PUBLIC_SITE_URL.startsWith('https://')) {
+        return process.env.NEXT_PUBLIC_SITE_URL;
+    }
+    // Default to https if no protocol is provided, common for bare domains in env vars
+    return `https://${process.env.NEXT_PUBLIC_SITE_URL}`;
+  }
+  // 2. Use Vercel's provided URL if deploying on Vercel
   if (process.env.NEXT_PUBLIC_VERCEL_URL) {
     return `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`;
   }
-  // Fallback for local development
-  return process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:9002';
+  // 3. Fallback for local development (typically http://localhost:PORT)
+  return 'http://localhost:9002'; // Default to your local dev port
 };
 
 
@@ -61,7 +68,7 @@ export async function POST(req: NextRequest) {
       metadata: {
         userId: userId,
         shippingAddress: JSON.stringify(shippingAddress), // Store shipping address for webhook
-        cartItems: JSON.stringify(items.map(item => ({id: item.id, quantity: item.quantity, price: item.price }))) // Store cart item details for webhook
+        cartItems: JSON.stringify(items.map(item => ({id: item.id, name: item.name, imageUrl: item.imageUrl, dataAiHint: item.dataAiHint, quantity: item.quantity, price: item.price }))) // Store more complete cart item details for webhook
       },
       // You can also pass customer_email if you have it
       // customer_email: shippingAddress.email, // If you want Stripe to prefill email

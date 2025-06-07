@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { CartItem, Product } from '@/lib/types';
@@ -38,16 +37,28 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    const storedCart = localStorage.getItem('pizzaPlaceCart');
-    if (storedCart) {
-      setCartItems(JSON.parse(storedCart));
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const storedCart = localStorage.getItem('pizzaPlaceCart');
+        if (storedCart) {
+          setCartItems(JSON.parse(storedCart));
+        }
+      } catch (error) {
+        console.error("Error reading cart from localStorage:", error);
+        // Optionally clear localStorage if it's corrupted
+        // localStorage.removeItem('pizzaPlaceCart');
+      }
     }
     setIsInitialized(true);
   }, []);
 
   useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem('pizzaPlaceCart', JSON.stringify(cartItems));
+    if (isInitialized && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.setItem('pizzaPlaceCart', JSON.stringify(cartItems));
+      } catch (error) {
+        console.error("Error saving cart to localStorage:", error);
+      }
     }
   }, [cartItems, isInitialized]);
 
@@ -78,6 +89,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
   const clearCart = () => {
     setCartItems([]);
+     // Also clear from localStorage directly if needed, though the useEffect should handle it
+    if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+            localStorage.removeItem('pizzaPlaceCart');
+        } catch (error) {
+            console.error("Error clearing cart from localStorage:", error);
+        }
+    }
   };
 
   const getCartTotal = () => {
