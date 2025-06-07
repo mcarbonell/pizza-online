@@ -6,11 +6,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus, ClipboardList, RefreshCcw } from 'lucide-react';
+import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus, ClipboardList, RefreshCcw, Users, UserCheck, UserCog } from 'lucide-react';
 import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, query, orderBy, writeBatch, doc, updateDoc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
-import type { Product, Order } from '@/lib/types';
+import type { Product, Order, UserProfile } from '@/lib/types';
 import { initialProductData } from '@/data/products';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from "react-hook-form";
@@ -57,6 +56,7 @@ import { Progress } from "@/components/ui/progress";
 
 const productCategories = ['Pizzas', 'Sides', 'Drinks', 'Desserts'] as const;
 const orderStatuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'] as const;
+const userRoles = ['user', 'admin'] as const;
 const DEFAULT_PLACEHOLDER_IMAGE = 'https://placehold.co/600x400.png';
 
 const productFormSchema = z.object({
@@ -107,6 +107,13 @@ export default function AdminPage() {
   const [orderError, setOrderError] = useState<string | null>(null);
   const [isUpdatingOrderStatus, setIsUpdatingOrderStatus] = useState(false);
 
+  // User Management States
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [userManagementError, setUserManagementError] = useState<string | null>(null);
+  const [isUpdatingUserRole, setIsUpdatingUserRole] = useState(false);
+
+
   const editForm = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
@@ -153,6 +160,21 @@ export default function AdminPage() {
     }
   }, []);
 
+  const fetchUsers = useCallback(async () => {
+    setIsLoadingUsers(true); setUserManagementError(null);
+    try {
+      const q = query(collection(db, 'users'), orderBy('email'));
+      const querySnapshot = await getDocs(q);
+      setAllUsers(querySnapshot.docs.map(docSnap => ({ ...docSnap.data() } as UserProfile)));
+    } catch (err) {
+      console.error("Error fetching users for admin:", err);
+      setUserManagementError("Failed to load users.");
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  }, []);
+
+
   useEffect(() => {
     if (!authIsLoading && !isLoadingUserProfile) {
       if (!user) {
@@ -162,9 +184,10 @@ export default function AdminPage() {
       } else if (userProfile && userProfile.role === 'admin') {
         fetchProducts();
         fetchOrders();
+        fetchUsers();
       }
     }
-  }, [user, userProfile, authIsLoading, isLoadingUserProfile, router, fetchProducts, fetchOrders]);
+  }, [user, userProfile, authIsLoading, isLoadingUserProfile, router, fetchProducts, fetchOrders, fetchUsers]);
 
   useEffect(() => {
     if (editingProduct) {
@@ -276,12 +299,30 @@ export default function AdminPage() {
     try {
       await updateDoc(doc(db, 'orders', orderId), { status: newStatus, updatedAt: serverTimestamp() });
       toast({ title: "Estado del Pedido Actualizado", description: `El pedido #${orderId.substring(0,6)}... ahora está ${newStatus}.` });
-      fetchOrders(); // Refresh orders
+      fetchOrders(); 
     } catch (error) {
       console.error("Error updating order status:", error);
       toast({ title: "Error al Actualizar Estado", description: "No se pudo actualizar el estado del pedido.", variant: "destructive" });
     } finally {
       setIsUpdatingOrderStatus(false);
+    }
+  };
+
+  const handleUpdateUserRole = async (userIdToUpdate: string, newRole: typeof userRoles[number]) => {
+    if (user?.uid === userIdToUpdate) {
+      toast({ title: "Acción no permitida", description: "No puedes cambiar tu propio rol.", variant: "destructive"});
+      return;
+    }
+    setIsUpdatingUserRole(true);
+    try {
+      await updateDoc(doc(db, 'users', userIdToUpdate), { role: newRole, updatedAt: serverTimestamp() });
+      toast({ title: "Rol de Usuario Actualizado", description: `El rol del usuario ha sido cambiado a ${newRole}.` });
+      fetchUsers();
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      toast({ title: "Error al Actualizar Rol", description: "No se pudo actualizar el rol del usuario.", variant: "destructive" });
+    } finally {
+      setIsUpdatingUserRole(false);
     }
   };
 
@@ -296,6 +337,8 @@ export default function AdminPage() {
   if (!user || (userProfile && userProfile.role !== 'admin')) {
     return <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]"><ShieldAlert className="h-12 w-12 text-destructive mb-4" /><p>Acceso denegado.</p><Button onClick={() => router.push('/')} variant="link">Inicio</Button></div>;
   }
+
+  const isAnyActionInProgress = isImporting || isUploading || isDeletingProduct || isUpdatingOrderStatus || isUpdatingUserRole;
 
   const renderProductFormFields = (currentForm: typeof editForm | typeof addForm, currentImagePreview: string | null) => (
     <>
@@ -323,28 +366,28 @@ export default function AdminPage() {
   return (
     <div className="container mx-auto py-12 px-4 space-y-12">
       <Card className="shadow-xl">
-        <CardHeader className="border-b pb-4"><div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"><div><CardTitle className="text-3xl font-headline flex items-center gap-2"><LayoutDashboard /> Panel Admin</CardTitle><CardDescription>Gestiona productos y pedidos.</CardDescription></div><div className="flex gap-2"><AlertDialog><AlertDialogTrigger asChild><Button variant="outline" disabled={isImporting || isUploading || isDeletingProduct || isUpdatingOrderStatus}><UploadCloud />Importar Menú</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Confirmar Importación?</AlertDialogTitle><AlertDialogDescription>Añadirá productos iniciales. No borrará existentes.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isImporting}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleImportInitialMenu} disabled={isImporting}>{isImporting && <Loader2 className="animate-spin"/>}Confirmar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><Button onClick={handleOpenAddModal} disabled={isImporting || isUploading || isDeletingProduct || isUpdatingOrderStatus}><PackagePlus />Añadir Producto</Button></div></div></CardHeader>
+        <CardHeader className="border-b pb-4"><div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"><div><CardTitle className="text-3xl font-headline flex items-center gap-2"><LayoutDashboard /> Panel Admin</CardTitle><CardDescription>Gestiona productos, pedidos y usuarios.</CardDescription></div><div className="flex gap-2"><AlertDialog><AlertDialogTrigger asChild><Button variant="outline" disabled={isAnyActionInProgress}><UploadCloud />Importar Menú</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Confirmar Importación?</AlertDialogTitle><AlertDialogDescription>Añadirá productos iniciales. No borrará existentes.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isImporting}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleImportInitialMenu} disabled={isImporting}>{isImporting && <Loader2 className="animate-spin"/>}Confirmar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><Button onClick={handleOpenAddModal} disabled={isAnyActionInProgress}><PackagePlus />Añadir Producto</Button></div></div></CardHeader>
         <CardContent className="pt-6">
           <h2 className="text-2xl font-headline mb-6 flex items-center gap-2"><ShoppingBasket />Lista de Productos</h2>
           {isLoadingProducts ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando...</div>)
           : productError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{productError}</AlertDescription></Alert>)
           : products.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Productos</AlertTitle><AlertDescription>Usa "Importar Menú" o "Añadir Producto".</AlertDescription></Alert>)
           : (<div className="overflow-x-auto"><Table><TableCaption>Productos en Firestore.</TableCaption><TableHeader><TableRow><TableHead>Imagen</TableHead><TableHead>Nombre</TableHead><TableHead className="hidden md:table-cell">Categoría</TableHead><TableHead className="hidden lg:table-cell max-w-[300px] truncate">Descripción</TableHead><TableHead className="text-right">Precio</TableHead><TableHead className="text-center">Acciones</TableHead></TableRow></TableHeader>
-              <TableBody>{products.map((p) => (<TableRow key={p.id}><TableCell><Image src={p.imageUrl || DEFAULT_PLACEHOLDER_IMAGE} alt={p.name} width={48} height={48} className="rounded object-cover" data-ai-hint={p.dataAiHint}/></TableCell><TableCell className="font-medium">{p.name}</TableCell><TableCell className="hidden md:table-cell"><Badge variant="secondary">{p.category}</Badge></TableCell><TableCell className="hidden lg:table-cell text-xs max-w-[300px] truncate" title={p.description}>{p.description}</TableCell><TableCell className="text-right">€{p.price.toFixed(2)}</TableCell><TableCell className="text-center"><div className="flex justify-center gap-1 sm:gap-2"><Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenEditModal(p)} disabled={isUploading || isDeletingProduct || isUpdatingOrderStatus}><Edit /></Button><Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleOpenDeleteAlert(p)} disabled={isUploading || isDeletingProduct || isUpdatingOrderStatus}><Trash2 /></Button></div></TableCell></TableRow>))}</TableBody>
+              <TableBody>{products.map((p) => (<TableRow key={p.id}><TableCell><Image src={p.imageUrl || DEFAULT_PLACEHOLDER_IMAGE} alt={p.name} width={48} height={48} className="rounded object-cover" data-ai-hint={p.dataAiHint}/></TableCell><TableCell className="font-medium">{p.name}</TableCell><TableCell className="hidden md:table-cell"><Badge variant="secondary">{p.category}</Badge></TableCell><TableCell className="hidden lg:table-cell text-xs max-w-[300px] truncate" title={p.description}>{p.description}</TableCell><TableCell className="text-right">€{p.price.toFixed(2)}</TableCell><TableCell className="text-center"><div className="flex justify-center gap-1 sm:gap-2"><Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenEditModal(p)} disabled={isAnyActionInProgress}><Edit /></Button><Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleOpenDeleteAlert(p)} disabled={isAnyActionInProgress}><Trash2 /></Button></div></TableCell></TableRow>))}</TableBody>
             </Table></div>)}
         </CardContent>
         <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión CRUD de productos.</p></CardFooter>
       </Card>
 
       <Card className="shadow-xl">
-        <CardHeader className="border-b pb-4"><div className="flex justify-between items-center"><CardTitle className="text-3xl font-headline flex items-center gap-2"><ClipboardList /> Pedidos Recibidos</CardTitle><Button variant="outline" size="sm" onClick={fetchOrders} disabled={isLoadingOrders || isUpdatingOrderStatus}><RefreshCcw className={isLoadingOrders ? "animate-spin" : ""} /> Refrescar</Button></div></CardHeader>
+        <CardHeader className="border-b pb-4"><div className="flex justify-between items-center"><CardTitle className="text-3xl font-headline flex items-center gap-2"><ClipboardList /> Pedidos Recibidos</CardTitle><Button variant="outline" size="sm" onClick={fetchOrders} disabled={isLoadingOrders || isAnyActionInProgress}><RefreshCcw className={isLoadingOrders ? "animate-spin" : ""} /> Refrescar</Button></div></CardHeader>
         <CardContent className="pt-6">
           {isLoadingOrders ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando pedidos...</div>)
           : orderError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{orderError}</AlertDescription></Alert>)
           : orders.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Pedidos</AlertTitle><AlertDescription>Aún no se han realizado pedidos.</AlertDescription></Alert>)
           : (<div className="overflow-x-auto"><Table><TableCaption>Pedidos registrados en Firestore.</TableCaption><TableHeader><TableRow><TableHead>ID Pedido</TableHead><TableHead>Fecha</TableHead><TableHead>Cliente (Email)</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-center">Estado</TableHead></TableRow></TableHeader>
               <TableBody>{orders.map((order) => (<TableRow key={order.id}><TableCell className="font-mono text-xs">{order.id?.substring(0,8)}...</TableCell><TableCell>{formatDate(order.createdAt)}</TableCell><TableCell>{order.shippingAddress.email}</TableCell><TableCell className="text-right">€{order.totalAmount.toFixed(2)}</TableCell><TableCell className="text-center">
-                <Select value={order.status} onValueChange={(newStatus) => handleUpdateOrderStatus(order.id!, newStatus as typeof orderStatuses[number])} disabled={isUpdatingOrderStatus || isLoadingOrders}>
+                <Select value={order.status} onValueChange={(newStatus) => handleUpdateOrderStatus(order.id!, newStatus as typeof orderStatuses[number])} disabled={isAnyActionInProgress}>
                     <SelectTrigger className="w-[150px] h-9 text-xs"><SelectValue placeholder="Cambiar estado" /></SelectTrigger>
                     <SelectContent>{orderStatuses.map(status => (<SelectItem key={status} value={status} className="text-xs">{status}</SelectItem>))}</SelectContent>
                 </Select>
@@ -354,23 +397,56 @@ export default function AdminPage() {
          <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión de estados de pedidos.</p></CardFooter>
       </Card>
 
+      <Card className="shadow-xl">
+        <CardHeader className="border-b pb-4"><div className="flex justify-between items-center"><CardTitle className="text-3xl font-headline flex items-center gap-2"><Users /> Gestión de Usuarios</CardTitle><Button variant="outline" size="sm" onClick={fetchUsers} disabled={isLoadingUsers || isAnyActionInProgress}><RefreshCcw className={isLoadingUsers ? "animate-spin" : ""} /> Refrescar</Button></div></CardHeader>
+        <CardContent className="pt-6">
+          {isLoadingUsers ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando usuarios...</div>)
+          : userManagementError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{userManagementError}</AlertDescription></Alert>)
+          : allUsers.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Usuarios</AlertTitle><AlertDescription>No hay usuarios registrados.</AlertDescription></Alert>)
+          : (<div className="overflow-x-auto"><Table><TableCaption>Usuarios registrados en Firestore.</TableCaption><TableHeader><TableRow><TableHead>Email</TableHead><TableHead>Nombre</TableHead><TableHead className="text-center">Rol</TableHead></TableRow></TableHeader>
+              <TableBody>{allUsers.map((u) => (<TableRow key={u.uid}><TableCell className="font-medium">{u.email}</TableCell><TableCell>{u.displayName || 'N/A'}</TableCell><TableCell className="text-center">
+                <Select 
+                  value={u.role || 'user'} 
+                  onValueChange={(newRole) => handleUpdateUserRole(u.uid, newRole as typeof userRoles[number])} 
+                  disabled={isAnyActionInProgress || u.uid === user?.uid}
+                >
+                    <SelectTrigger className="w-[120px] h-9 text-xs mx-auto">
+                        <SelectValue placeholder="Cambiar rol">
+                            {u.role === 'admin' ? <UserCog className="inline mr-1.5 h-3.5 w-3.5" /> : <UserCheck className="inline mr-1.5 h-3.5 w-3.5" />}
+                            {u.role}
+                        </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>{userRoles.map(role => (<SelectItem key={role} value={role} className="text-xs">
+                        {role === 'admin' ? <UserCog className="inline mr-1.5 h-3.5 w-3.5" /> : <UserCheck className="inline mr-1.5 h-3.5 w-3.5" />}
+                        {role}
+                    </SelectItem>))}</SelectContent>
+                </Select>
+                {u.uid === user?.uid && <p className="text-xs text-muted-foreground mt-1">(Tu cuenta)</p>}
+              </TableCell></TableRow>))}</TableBody>
+            </Table></div>)}
+        </CardContent>
+        <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión de roles de usuarios.</p></CardFooter>
+      </Card>
+
+
       <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => { setIsEditModalOpen(isOpen); if (!isOpen) { setEditingProduct(null); editForm.reset(); resetImageStates();}}}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="flex items-center gap-2"><Edit/>Editar Producto</DialogTitle><DialogDescription>Modifica "{editingProduct?.name}".</DialogDescription></DialogHeader>
-          <Form {...editForm}><form onSubmit={editForm.handleSubmit(handleUpdateProduct)} className="space-y-4 py-4">{renderProductFormFields(editForm, imagePreview || editingProduct?.imageUrl || null)}<DialogFooter className="mt-6"><DialogClose asChild><Button type="button" variant="ghost" disabled={isUploading || isDeletingProduct || isUpdatingOrderStatus}>Cancelar</Button></DialogClose><Button type="submit" disabled={isUploading || editForm.formState.isSubmitting || isDeletingProduct || isUpdatingOrderStatus}>{isUploading?<Loader2 className="animate-spin"/>:<Save/>}{isUploading?'Subiendo...':'Guardar'}</Button></DialogFooter></form></Form>
+          <Form {...editForm}><form onSubmit={editForm.handleSubmit(handleUpdateProduct)} className="space-y-4 py-4">{renderProductFormFields(editForm, imagePreview || editingProduct?.imageUrl || null)}<DialogFooter className="mt-6"><DialogClose asChild><Button type="button" variant="ghost" disabled={isAnyActionInProgress}>Cancelar</Button></DialogClose><Button type="submit" disabled={isUploading || editForm.formState.isSubmitting || isAnyActionInProgress}>{isUploading?<Loader2 className="animate-spin"/>:<Save/>}{isUploading?'Subiendo...':'Guardar'}</Button></DialogFooter></form></Form>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isAddModalOpen} onOpenChange={(isOpen) => { setIsAddModalOpen(isOpen); if (!isOpen) { addForm.reset(); resetImageStates();}}}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="flex items-center gap-2"><PackagePlus/>Añadir Producto</DialogTitle><DialogDescription>Completa los detalles.</DialogDescription></DialogHeader>
-          <Form {...addForm}><form onSubmit={addForm.handleSubmit(handleAddNewProduct)} className="space-y-4 py-4">{renderProductFormFields(addForm, imagePreview)}<DialogFooter className="mt-6"><DialogClose asChild><Button type="button" variant="ghost" disabled={isUploading || isDeletingProduct || isUpdatingOrderStatus}>Cancelar</Button></DialogClose><Button type="submit" disabled={isUploading || addForm.formState.isSubmitting || isDeletingProduct || isUpdatingOrderStatus}>{isUploading?<Loader2 className="animate-spin"/>:<Save/>}{isUploading?'Subiendo...':'Añadir'}</Button></DialogFooter></form></Form>
+          <Form {...addForm}><form onSubmit={addForm.handleSubmit(handleAddNewProduct)} className="space-y-4 py-4">{renderProductFormFields(addForm, imagePreview)}<DialogFooter className="mt-6"><DialogClose asChild><Button type="button" variant="ghost" disabled={isAnyActionInProgress}>Cancelar</Button></DialogClose><Button type="submit" disabled={isUploading || addForm.formState.isSubmitting || isAnyActionInProgress}>{isUploading?<Loader2 className="animate-spin"/>:<Save/>}{isUploading?'Subiendo...':'Añadir'}</Button></DialogFooter></form></Form>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
         <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Eliminar "{productToDelete?.name}"?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará de Firestore y Storage.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel onClick={() => setProductToDelete(null)} disabled={isDeletingProduct}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleConfirmDelete} disabled={isDeletingProduct} className={buttonVariants({ variant: "destructive" })}>{isDeletingProduct && <Loader2 className="animate-spin"/>}{isDeletingProduct ? 'Eliminando...' : 'Eliminar'}</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel onClick={() => setProductToDelete(null)} disabled={isDeletingProduct}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleConfirmDelete} disabled={isDeletingProduct || isAnyActionInProgress} className={buttonVariants({ variant: "destructive" })}>{isDeletingProduct && <Loader2 className="animate-spin"/>}{isDeletingProduct ? 'Eliminando...' : 'Eliminar'}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 }
+
