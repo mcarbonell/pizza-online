@@ -7,9 +7,9 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus } from 'lucide-react';
-import { db, storage } from '@/lib/firebase'; // Import storage
-import { collection, getDocs, query, orderBy, writeBatch, doc, updateDoc } from 'firebase/firestore';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"; // Storage imports
+import { db, storage } from '@/lib/firebase';
+import { collection, getDocs, query, orderBy, writeBatch, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import type { Product } from '@/lib/types';
 import { initialProductData } from '@/data/products';
 import { useToast } from '@/hooks/use-toast';
@@ -44,7 +44,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogClose,
@@ -53,9 +52,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress"; // Import Progress component
+import { Progress } from "@/components/ui/progress";
 
 const productCategories = ['Pizzas', 'Sides', 'Drinks', 'Desserts'] as const;
+const DEFAULT_PLACEHOLDER_IMAGE = 'https://placehold.co/600x400.png';
 
 const productFormSchema = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
@@ -71,9 +71,11 @@ const productFormSchema = z.object({
   category: z.enum(productCategories, {
     errorMap: () => ({ message: "Por favor selecciona una categoría válida." }),
   }),
-  // imageUrl is still a string, as it stores the download URL. The file upload will populate this.
-  imageUrl: z.string().url({ message: "Se requiere una URL de imagen válida o subir una nueva imagen." }).or(z.literal('')),
-  dataAiHint: z.string().optional(),
+  // imageUrl is not directly in the form for user input for add/edit with upload,
+  // but the schema is used for the data that gets saved to Firestore.
+  // It's populated by the upload logic.
+  imageUrl: z.string().url({ message: "Se requiere una URL de imagen válida." }).optional().or(z.literal('')),
+  dataAiHint: z.string().max(30, "La pista de IA no debe exceder los 30 caracteres.").optional(),
 });
 
 type ProductFormValues = z.infer<typeof productFormSchema>;
@@ -90,15 +92,14 @@ export default function AdminPage() {
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // States for image upload
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
-
-  const form = useForm<ProductFormValues>({
+  const editForm = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
       name: "",
@@ -110,16 +111,35 @@ export default function AdminPage() {
     },
   });
 
+  const addForm = useForm<ProductFormValues>({
+    resolver: zodResolver(productFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      price: 0,
+      category: "Pizzas",
+      imageUrl: DEFAULT_PLACEHOLDER_IMAGE, // Default for new products if no image uploaded
+      dataAiHint: "",
+    },
+  });
+
+  const resetImageStates = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setUploadProgress(null);
+    setIsUploading(false);
+  };
+
   const fetchProducts = useCallback(async () => {
     setIsLoadingProducts(true);
     setProductError(null);
     try {
-      const productsCollection = collection(db, 'products');
-      const q = query(productsCollection, orderBy('category'), orderBy('name'));
+      const productsCollectionRef = collection(db, 'products');
+      const q = query(productsCollectionRef, orderBy('category'), orderBy('name'));
       const querySnapshot = await getDocs(q);
-      const productsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+      const productsData = querySnapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        ...docSnap.data()
       } as Product));
       setProducts(productsData);
     } catch (err) {
@@ -145,19 +165,22 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (editingProduct) {
-      form.reset({
+      editForm.reset({
         name: editingProduct.name,
         description: editingProduct.description,
         price: editingProduct.price,
         category: editingProduct.category as typeof productCategories[number],
-        imageUrl: editingProduct.imageUrl, // This will be the current URL
+        imageUrl: editingProduct.imageUrl,
         dataAiHint: editingProduct.dataAiHint || "",
       });
-      setImageFile(null); // Reset file states when a new product is selected for editing
-      setImagePreview(null);
+      // Ensure image preview reflects the current product's image when modal opens
+      setImagePreview(editingProduct.imageUrl || null);
+      setImageFile(null); // Reset file selection
       setUploadProgress(null);
+    } else {
+       editForm.reset(editForm.formState.defaultValues); // Reset to defaults if no product
     }
-  }, [editingProduct, form]);
+  }, [editingProduct, editForm]);
 
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,10 +198,10 @@ export default function AdminPage() {
     setIsImporting(true);
     try {
       const batch = writeBatch(db);
-      const productsCollection = collection(db, 'products');
+      const productsCollectionRef = collection(db, 'products');
 
       initialProductData.forEach(productData => {
-        const newProductRef = doc(productsCollection); 
+        const newProductRef = doc(productsCollectionRef);
         batch.set(newProductRef, productData);
       });
 
@@ -204,22 +227,30 @@ export default function AdminPage() {
   const handleOpenEditModal = (product: Product) => {
     setEditingProduct(product);
     setIsEditModalOpen(true);
+    // Preview is set by useEffect on editingProduct change
+  };
+  
+  const handleOpenAddModal = () => {
+    addForm.reset();
+    resetImageStates();
+    setIsAddModalOpen(true);
   };
 
   const handleUpdateProduct = async (formData: ProductFormValues) => {
     if (!editingProduct) return;
 
-    setIsUploading(true); // Indicate start of general update process
-    setUploadProgress(0); // Reset progress for potential new upload
+    setIsUploading(true);
+    setUploadProgress(0);
 
-    let finalImageUrl = formData.imageUrl; // Use existing imageUrl from form by default
+    let finalImageUrl = editingProduct.imageUrl; // Use existing imageUrl by default
 
     try {
-      if (imageFile) { // If a new file was selected for upload
-        const imageStorageRef = storageRef(storage, `products/${editingProduct.id}/${imageFile.name}`);
-        const uploadTask = uploadBytesResumable(imageStorageRef, imageFile);
+      if (imageFile) {
+        const imageStoragePath = `products/${editingProduct.id}/${imageFile.name}`;
+        const imageStorageRefInstance = storageRef(storage, imageStoragePath);
+        const uploadTask = uploadBytesResumable(imageStorageRefInstance, imageFile);
 
-        await new Promise<void>((resolve, reject) => {
+        finalImageUrl = await new Promise<string>((resolve, reject) => {
           uploadTask.on('state_changed',
             (snapshot) => {
               const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
@@ -227,24 +258,19 @@ export default function AdminPage() {
             },
             (error) => {
               console.error("Upload failed:", error);
-              toast({
-                title: "Error al Subir Imagen",
-                description: "No se pudo subir la nueva imagen. Verifica las reglas de Storage y la consola.",
-                variant: "destructive",
-              });
               reject(error);
             },
             async () => {
-              finalImageUrl = await getDownloadURL(uploadTask.snapshot.ref);
-              resolve();
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve(downloadURL);
             }
           );
         });
       }
 
-      // Prepare data for Firestore update, ensuring imageUrl is the potentially new one
-      const productDataToUpdate: ProductFormValues = {
+      const productDataToUpdate = {
         ...formData,
+        price: Number(formData.price), // Ensure price is number
         imageUrl: finalImageUrl,
       };
       
@@ -253,21 +279,83 @@ export default function AdminPage() {
       
       toast({
         title: "Producto Actualizado",
-        description: `El producto "${productDataToUpdate.name}" ha sido actualizado correctamente.`,
-        variant: "default",
+        description: `El producto "${productDataToUpdate.name}" ha sido actualizado.`,
       });
       setIsEditModalOpen(false);
       setEditingProduct(null);
-      setImageFile(null);
-      setImagePreview(null);
+      resetImageStates();
       fetchProducts();
 
     } catch (error) {
-      // This catch block handles errors from Firestore update or from the image upload promise rejection
       console.error("Error updating product or uploading image:", error);
       toast({
         title: "Error al Actualizar",
-        description: "No se pudo actualizar el producto. Revisa la consola para más detalles.",
+        description: "No se pudo actualizar el producto. Revisa la consola.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(null);
+    }
+  };
+  
+  const handleAddNewProduct = async (formData: ProductFormValues) => {
+    setIsUploading(true);
+    setUploadProgress(0);
+    
+    try {
+      // Step 1: Add product data to Firestore to get an ID
+      const productDataForFirestore = {
+        ...formData,
+        price: Number(formData.price), // Ensure price is number
+        imageUrl: '', // Temporary, will be updated after image upload
+        createdAt: serverTimestamp(),
+      };
+      
+      const docRef = await addDoc(collection(db, 'products'), productDataForFirestore);
+      const newProductId = docRef.id;
+      let finalImageUrl = DEFAULT_PLACEHOLDER_IMAGE; // Default placeholder
+
+      if (imageFile) {
+        const imageStoragePath = `products/${newProductId}/${imageFile.name}`;
+        const imageStorageRefInstance = storageRef(storage, imageStoragePath);
+        const uploadTask = uploadBytesResumable(imageStorageRefInstance, imageFile);
+
+        finalImageUrl = await new Promise<string>((resolve, reject) => {
+          uploadTask.on('state_changed',
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(progress);
+            },
+            (error) => { console.error("Upload failed:", error); reject(error); },
+            async () => {
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve(downloadURL);
+            }
+          );
+        });
+        // Step 2: Update the product document with the actual image URL
+        await updateDoc(docRef, { imageUrl: finalImageUrl });
+      } else {
+        // If no image file, still update with the default placeholder if necessary
+        // (though it might be set initially, this ensures it if logic changes)
+         await updateDoc(docRef, { imageUrl: finalImageUrl });
+      }
+      
+      toast({
+        title: "Producto Añadido",
+        description: `El producto "${formData.name}" ha sido añadido correctamente.`,
+      });
+      setIsAddModalOpen(false);
+      resetImageStates();
+      addForm.reset();
+      fetchProducts();
+
+    } catch (error) {
+      console.error("Error adding new product or uploading image:", error);
+      toast({
+        title: "Error al Añadir Producto",
+        description: "No se pudo añadir el producto. Revisa la consola.",
         variant: "destructive",
       });
     } finally {
@@ -296,6 +384,117 @@ export default function AdminPage() {
     );
   }
 
+  const renderProductFormFields = (currentForm: typeof editForm | typeof addForm, currentImagePreview: string | null) => (
+    <>
+      <FormField
+        control={currentForm.control}
+        name="name"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Nombre del Producto</FormLabel>
+            <FormControl><Input placeholder="Ej: Pizza Margherita" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={currentForm.control}
+        name="description"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Descripción</FormLabel>
+            <FormControl><Textarea placeholder="Describe el producto..." {...field} rows={3} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={currentForm.control}
+          name="price"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Precio (€)</FormLabel>
+              <FormControl><Input type="number" placeholder="0.00" {...field} step="0.01" /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={currentForm.control}
+          name="category"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Categoría</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una categoría" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {productCategories.map(category => (
+                    <SelectItem key={category} value={category}>{category}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+      
+      <FormItem>
+        <FormLabel>Imagen del Producto</FormLabel>
+        <div className="space-y-2">
+          {(currentImagePreview || (editingProduct && currentForm === editForm && editingProduct.imageUrl)) && (
+            <div className="relative w-full h-48 rounded-md overflow-hidden border">
+              <Image
+                src={currentImagePreview || (editingProduct && currentForm === editForm ? editingProduct.imageUrl : DEFAULT_PLACEHOLDER_IMAGE)}
+                alt={currentForm.getValues('name') || "Vista previa"}
+                layout="fill"
+                objectFit="cover"
+              />
+            </div>
+          )}
+          <FormControl>
+            <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" asChild>
+                <label htmlFor="image-upload-modal" className="cursor-pointer flex items-center gap-2">
+                    <ImagePlus className="h-4 w-4" />
+                    {imageFile ? "Cambiar imagen" : "Subir imagen"}
+                </label>
+                </Button>
+                <Input id="image-upload-modal" type="file" accept="image/*" onChange={handleImageFileChange} className="hidden" />
+                {imageFile && <span className="text-xs text-muted-foreground truncate max-w-[150px]">{imageFile.name}</span>}
+            </div>
+          </FormControl>
+          {isUploading && uploadProgress !== null && (
+            <div className="space-y-1">
+                <Progress value={uploadProgress} className="w-full h-2" />
+                <p className="text-xs text-muted-foreground text-center">{Math.round(uploadProgress)}% subido</p>
+            </div>
+          )}
+          {/* Use form errors for imageUrl if any (though it's mostly handled by upload logic) */}
+          {/* <FormMessage>{currentForm.formState.errors.imageUrl?.message}</FormMessage> */}
+        </div>
+      </FormItem>
+
+      <FormField
+        control={currentForm.control}
+        name="dataAiHint"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Pista para IA (Opcional, 1-2 palabras)</FormLabel>
+            <FormControl><Input placeholder="ej: pepperoni pizza" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </>
+  );
+
+
   return (
     <div className="container mx-auto py-12 px-4">
       <Card className="shadow-xl">
@@ -310,7 +509,7 @@ export default function AdminPage() {
             <div className="flex gap-2">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="outline" disabled={isImporting}>
+                  <Button variant="outline" disabled={isImporting || isUploading}>
                     {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
                     Importar Menú Inicial
                   </Button>
@@ -321,7 +520,7 @@ export default function AdminPage() {
                     <AlertDialogDescription>
                       Esto añadirá los productos del menú inicial a la colección 'products' en Firestore.
                       Esta acción no borrará los productos existentes, solo añadirá los nuevos.
-                      Asegúrate de que las reglas de seguridad de Firestore permitan la escritura en la colección 'products' para administradores.
+                      Asegúrate de que las reglas de seguridad de Firestore permitan la escritura.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -333,8 +532,8 @@ export default function AdminPage() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-              <Button disabled>
-                <PackagePlus className="mr-2 h-4 w-4" /> Añadir Producto (Próximamente)
+              <Button onClick={handleOpenAddModal} disabled={isImporting || isUploading}>
+                <PackagePlus className="mr-2 h-4 w-4" /> Añadir Producto
               </Button>
             </div>
           </div>
@@ -359,8 +558,7 @@ export default function AdminPage() {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>No Hay Productos</AlertTitle>
               <AlertDescription>
-                No se encontraron productos en la base de datos. Puedes usar el botón "Importar Menú Inicial"
-                para cargar el conjunto de productos predefinido o añadir productos individualmente (próximamente).
+                No se encontraron productos en la base de datos. Puedes usar "Importar Menú Inicial" o "Añadir Producto".
               </AlertDescription>
             </Alert>
           ) : (
@@ -382,7 +580,7 @@ export default function AdminPage() {
                     <TableRow key={product.id}>
                       <TableCell>
                         <Image
-                          src={product.imageUrl || 'https://placehold.co/80x80.png'}
+                          src={product.imageUrl || DEFAULT_PLACEHOLDER_IMAGE}
                           alt={product.name}
                           width={48}
                           height={48}
@@ -397,10 +595,10 @@ export default function AdminPage() {
                       <TableCell className="hidden lg:table-cell text-xs text-muted-foreground max-w-[300px] truncate" title={product.description}>
                         {product.description}
                       </TableCell>
-                      <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">€{product.price.toFixed(2)}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex justify-center gap-1 sm:gap-2">
-                          <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => handleOpenEditModal(product)}>
+                          <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => handleOpenEditModal(product)} disabled={isUploading}>
                             <Edit className="h-4 w-4" />
                              <span className="sr-only">Editar</span>
                           </Button>
@@ -419,7 +617,7 @@ export default function AdminPage() {
         </CardContent>
         <CardFooter className="border-t pt-4">
             <p className="text-xs text-muted-foreground">
-                Funcionalidades CRUD para productos y gestión de pedidos se añadirán próximamente.
+                Funcionalidad de eliminar productos se añadirá próximamente.
             </p>
         </CardFooter>
       </Card>
@@ -428,12 +626,9 @@ export default function AdminPage() {
       <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => {
         setIsEditModalOpen(isOpen);
         if (!isOpen) {
-          setEditingProduct(null);
-          form.reset();
-          setImageFile(null);
-          setImagePreview(null);
-          setUploadProgress(null);
-          setIsUploading(false);
+          setEditingProduct(null); // Clear editing product when dialog closes
+          editForm.reset();
+          resetImageStates();
         }
       }}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
@@ -443,118 +638,14 @@ export default function AdminPage() {
               Modifica los detalles del producto "{editingProduct?.name}". Haz clic en guardar cuando termines.
             </DialogDescription>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleUpdateProduct)} className="space-y-4 py-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre del Producto</FormLabel>
-                    <FormControl><Input placeholder="Ej: Pizza Margherita" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descripción</FormLabel>
-                    <FormControl><Textarea placeholder="Describe el producto..." {...field} rows={3} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Precio ($)</FormLabel>
-                      <FormControl><Input type="number" placeholder="0.00" {...field} step="0.01" /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Categoría</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona una categoría" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {productCategories.map(category => (
-                            <SelectItem key={category} value={category}>{category}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              {/* Image Upload Section */}
-              <FormItem>
-                <FormLabel>Imagen del Producto</FormLabel>
-                <div className="space-y-2">
-                  {(imagePreview || (editingProduct && editingProduct.imageUrl)) && (
-                    <div className="relative w-full h-48 rounded-md overflow-hidden border">
-                      <Image
-                        src={imagePreview || editingProduct?.imageUrl || 'https://placehold.co/600x400.png'}
-                        alt={editingProduct?.name || "Vista previa"}
-                        layout="fill"
-                        objectFit="cover"
-                      />
-                    </div>
-                  )}
-                  <FormControl>
-                    <div className="flex items-center gap-2">
-                       <Button type="button" variant="outline" size="sm" asChild>
-                        <label htmlFor="image-upload" className="cursor-pointer flex items-center gap-2">
-                           <ImagePlus className="h-4 w-4" />
-                           {imageFile ? "Cambiar imagen" : "Subir imagen"}
-                        </label>
-                      </Button>
-                      <Input id="image-upload" type="file" accept="image/*" onChange={handleImageFileChange} className="hidden" />
-                      {imageFile && <span className="text-xs text-muted-foreground truncate max-w-[150px]">{imageFile.name}</span>}
-                    </div>
-                  </FormControl>
-                  {isUploading && uploadProgress !== null && (
-                    <div className="space-y-1">
-                       <Progress value={uploadProgress} className="w-full h-2" />
-                       <p className="text-xs text-muted-foreground text-center">{Math.round(uploadProgress)}% subido</p>
-                    </div>
-                  )}
-                  <FormMessage>{form.formState.errors.imageUrl?.message}</FormMessage>
-                </div>
-              </FormItem>
-
-              <FormField
-                control={form.control}
-                name="dataAiHint"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Pista para IA (Opcional, 1-2 palabras)</FormLabel>
-                    <FormControl><Input placeholder="ej: pepperoni pizza" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleUpdateProduct)} className="space-y-4 py-4">
+              {renderProductFormFields(editForm, imagePreview || editingProduct?.imageUrl || null)}
               <DialogFooter className="mt-6">
                 <DialogClose asChild>
-                  <Button type="button" variant="ghost">Cancelar</Button>
+                  <Button type="button" variant="ghost" disabled={isUploading}>Cancelar</Button>
                 </DialogClose>
-                <Button type="submit" disabled={isUploading || form.formState.isSubmitting}>
+                <Button type="submit" disabled={isUploading || editForm.formState.isSubmitting}>
                   {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   {isUploading ? 'Subiendo...' : 'Guardar Cambios'}
                 </Button>
@@ -563,6 +654,40 @@ export default function AdminPage() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Add Product Dialog */}
+      <Dialog open={isAddModalOpen} onOpenChange={(isOpen) => {
+        setIsAddModalOpen(isOpen);
+        if (!isOpen) {
+          addForm.reset();
+          resetImageStates();
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><PackagePlus className="h-5 w-5"/> Añadir Nuevo Producto</DialogTitle>
+            <DialogDescription>
+              Completa los detalles para añadir un nuevo producto al menú.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...addForm}>
+            <form onSubmit={addForm.handleSubmit(handleAddNewProduct)} className="space-y-4 py-4">
+              {renderProductFormFields(addForm, imagePreview)}
+              <DialogFooter className="mt-6">
+                <DialogClose asChild>
+                  <Button type="button" variant="ghost" disabled={isUploading}>Cancelar</Button>
+                </DialogClose>
+                <Button type="submit" disabled={isUploading || addForm.formState.isSubmitting}>
+                  {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  {isUploading ? 'Subiendo...' : 'Añadir Producto'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
+
