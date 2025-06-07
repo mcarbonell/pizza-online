@@ -1,7 +1,8 @@
+
 "use client";
 
 import type { CartItem, Product } from '@/lib/types';
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, type ReactNode, useCallback } from 'react';
 
 interface CartContextType {
   cartItems: CartItem[];
@@ -45,8 +46,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         }
       } catch (error) {
         console.error("Error reading cart from localStorage:", error);
-        // Optionally clear localStorage if it's corrupted
-        // localStorage.removeItem('pizzaPlaceCart');
       }
     }
     setIsInitialized(true);
@@ -62,7 +61,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     }
   }, [cartItems, isInitialized]);
 
-  const addToCart = (product: Product) => {
+  const addToCart = useCallback((product: Product) => {
     setCartItems((prevItems) => {
       const existingItem = prevItems.find((item) => item.id === product.id);
       if (existingItem) {
@@ -72,24 +71,23 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       }
       return [...prevItems, { ...product, quantity: 1 }];
     });
-    if (!isCartOpen) setIsCartOpen(true);
-  };
+    setIsCartOpen(true); // Open cart when item is added
+  }, []);
 
-  const removeFromCart = (productId: string) => {
+  const removeFromCart = useCallback((productId: string) => {
     setCartItems((prevItems) => prevItems.filter((item) => item.id !== productId));
-  };
+  }, []);
 
-  const updateItemQuantity = (productId: string, quantity: number) => {
+  const updateItemQuantity = useCallback((productId: string, quantity: number) => {
     setCartItems((prevItems) =>
       prevItems.map((item) =>
         item.id === productId ? { ...item, quantity: Math.max(0, quantity) } : item
-      ).filter(item => item.quantity > 0) // Remove if quantity is 0
+      ).filter(item => item.quantity > 0)
     );
-  };
+  }, []);
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCartItems([]);
-     // Also clear from localStorage directly if needed, though the useEffect should handle it
     if (typeof window !== 'undefined' && window.localStorage) {
         try {
             localStorage.removeItem('pizzaPlaceCart');
@@ -97,19 +95,19 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
             console.error("Error clearing cart from localStorage:", error);
         }
     }
-  };
+  }, []);
 
-  const getCartTotal = () => {
+  const getCartTotal = useCallback(() => {
     return cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
-  };
+  }, [cartItems]);
 
-  const getTotalItems = () => {
+  const getTotalItems = useCallback(() => {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
-  };
+  }, [cartItems]);
 
-  const toggleCart = () => setIsCartOpen(!isCartOpen);
-  const openCart = () => setIsCartOpen(true);
-  const closeCart = () => setIsCartOpen(false);
+  const toggleCart = useCallback(() => setIsCartOpen(prev => !prev), []);
+  const openCart = useCallback(() => setIsCartOpen(true), []);
+  const closeCart = useCallback(() => setIsCartOpen(false), []);
 
 
   return (
