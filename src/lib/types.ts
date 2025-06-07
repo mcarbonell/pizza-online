@@ -1,13 +1,17 @@
 
 export interface Product {
-  id: string;
+  id: string; // Firestore document ID
   name: string;
   description: string;
   price: number;
   imageUrl: string;
-  category: string;
+  category: 'Pizzas' | 'Sides' | 'Drinks' | 'Desserts' | 'Hamburguesas' | 'Sandwiches' | 'Kebabs' | 'Raciones';
   dataAiHint: string;
 }
+
+// Type for the initial product data, an ID is not needed here as Firestore will generate it.
+export type ProductSeedData = Omit<Product, 'id'>;
+
 
 export interface CartItem extends Product {
   quantity: number;
@@ -46,7 +50,7 @@ export interface UserProfile {
   email: string | null;
   displayName?: string | null;
   emailVerified?: boolean;
-  role?: 'admin' | 'user'; // Added role
+  role?: 'admin' | 'user'; 
   defaultShippingAddress?: ShippingAddressDetails | null; 
   defaultPaymentMethod?: SimulatedPaymentMethod | null;
   createdAt: any; 
@@ -59,7 +63,7 @@ export interface Order {
   items: CartItem[];
   totalAmount: number;
   shippingAddress: ShippingAddressDetails; 
-  paymentDetails: PaymentDetails; // For order record, it's still PaymentDetails
+  paymentDetails: PaymentDetails; 
   createdAt: any; 
   status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
 }
