@@ -29,12 +29,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import dynamic from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
 
-const OrderTrackingMap = dynamic(() => import('@/components/maps/OrderTrackingMap'), {
-  ssr: false,
-  loading: () => <div className="h-[300px] w-full bg-muted rounded-md flex items-center justify-center my-4"><Loader2 className="animate-spin h-8 w-8 text-primary" /><p className="ml-2">Cargando mapa...</p></div>,
-});
-
-
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "La contraseña actual es requerida."),
   newPassword: z.string().min(6, "La nueva contraseña debe tener al menos 6 caracteres."),
@@ -47,25 +41,47 @@ type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 const updateUserProfileSchema = z.object({
   displayName: z.string().min(2, "El nombre debe tener al menos 2 caracteres.").max(50, "El nombre no puede exceder los 50 caracteres."),
-  shippingName: z.string().min(2, "El nombre para envío es requerido.").optional().or(z.literal('')),
+  shippingName: z.string().optional().or(z.literal('')),
   shippingEmail: z.string().email("Introduce un email de envío válido.").optional().or(z.literal('')),
-  shippingAddress: z.string().min(5, "La dirección de envío es requerida.").optional().or(z.literal('')),
-  shippingCity: z.string().min(2, "La ciudad de envío es requerida.").optional().or(z.literal('')),
-  shippingPostalCode: z.string().min(3, "El código postal de envío es requerido.").optional().or(z.literal('')),
+  shippingAddress: z.string().optional().or(z.literal('')),
+  shippingCity: z.string().optional().or(z.literal('')),
+  shippingPostalCode: z.string().optional().or(z.literal('')),
   shippingPhone: z.string().optional().or(z.literal('')),
 }).refine(data => {
-  const shippingFields = [data.shippingName, data.shippingEmail, data.shippingAddress, data.shippingCity, data.shippingPostalCode];
-  const someShippingPresent = shippingFields.some(field => field && field.length > 0);
-  const allRequiredShippingPresent = data.shippingName && data.shippingEmail && data.shippingAddress && data.shippingCity && data.shippingPostalCode;
-  if (someShippingPresent && (!allRequiredShippingPresent && ( !data.shippingName || !data.shippingEmail || !data.shippingAddress || !data.shippingCity || !data.shippingPostalCode ))) { return false; }
-  return true;
-}, { message: "Si se proporciona un detalle de envío, todos sus campos principales son requeridos (excepto teléfono).", path: ["shippingName"], });
+  const coreShippingFields = [
+    data.shippingName, 
+    data.shippingEmail, 
+    data.shippingAddress, 
+    data.shippingCity, 
+    data.shippingPostalCode
+  ];
+  const allShippingFieldsIncludingOptional = [...coreShippingFields, data.shippingPhone];
+
+  const someShippingPresent = allShippingFieldsIncludingOptional.some(field => field && field.trim().length > 0);
+
+  if (!someShippingPresent) {
+    return true; // All fields are empty or whitespace, which is valid.
+  }
+
+  // If some shipping detail IS provided, then all core required fields must be non-empty.
+  const allCoreRequiredShippingPresent = 
+    data.shippingName && data.shippingName.trim().length > 0 &&
+    data.shippingEmail && data.shippingEmail.trim().length > 0 && // Zod's .email() handles format
+    data.shippingAddress && data.shippingAddress.trim().length > 0 &&
+    data.shippingCity && data.shippingCity.trim().length > 0 &&
+    data.shippingPostalCode && data.shippingPostalCode.trim().length > 0;
+  
+  return allCoreRequiredShippingPresent;
+}, { 
+  message: "Si proporcionas algún detalle de envío, los campos Nombre, Email, Dirección, Ciudad y Código Postal son obligatorios.", 
+  path: ["shippingName"], 
+});
 
 type UpdateUserProfileFormValuesZod = z.infer<typeof updateUserProfileSchema>;
 
 
 export default function ProfilePage() {
-  const { user, userProfile, logout, updateUserPassword, updateUserProfileDetails, resendVerificationEmail, isLoading: authIsLoading, isLoadingUserProfile } = useAuth();
+  const { user, userProfile, logout, updateUserPassword, updateUserProfileDetails, resendVerificationEmail, isLoading: authIsLoading, isLoadingUserProfile, fetchUserProfile } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -79,13 +95,42 @@ export default function ProfilePage() {
   const hasPasswordProvider = user?.providerData?.some(p => p.providerId === 'password');
 
   const passwordForm = useForm<ChangePasswordFormValues>({ resolver: zodResolver(changePasswordSchema), defaultValues: { currentPassword: "", newPassword: "", confirmNewPassword: "" }, });
-  const editProfileForm = useForm<UpdateUserProfileFormValuesZod>({ resolver: zodResolver(updateUserProfileSchema), defaultValues: { displayName: userProfile?.displayName || user?.displayName || "", shippingName: userProfile?.defaultShippingAddress?.name || "", shippingEmail: userProfile?.defaultShippingAddress?.email || "", shippingAddress: userProfile?.defaultShippingAddress?.address || "", shippingCity: userProfile?.defaultShippingAddress?.city || "", shippingPostalCode: userProfile?.defaultShippingAddress?.postalCode || "", shippingPhone: userProfile.defaultShippingAddress?.phone || "", }, });
+  const editProfileForm = useForm<UpdateUserProfileFormValuesZod>({
+    resolver: zodResolver(updateUserProfileSchema),
+    defaultValues: {
+      displayName: userProfile?.displayName || user?.displayName || "",
+      shippingName: userProfile?.defaultShippingAddress?.name || "",
+      shippingEmail: userProfile?.defaultShippingAddress?.email || "",
+      shippingAddress: userProfile?.defaultShippingAddress?.address || "",
+      shippingCity: userProfile?.defaultShippingAddress?.city || "",
+      shippingPostalCode: userProfile?.defaultShippingAddress?.postalCode || "",
+      shippingPhone: userProfile?.defaultShippingAddress?.phone || "",
+    },
+  });
 
-  useEffect(() => { if (!authIsLoading && !user) { router.push('/login?redirect=/profile'); } }, [user, authIsLoading, router]);
+  useEffect(() => { 
+    if (!authIsLoading && !user) { 
+      router.push('/login?redirect=/profile'); 
+    } 
+  }, [user, authIsLoading, router]);
 
-  useEffect(() => { if (userProfile && isEditProfileDialogOpen && !editProfileForm.formState.isDirty) { editProfileForm.reset({ displayName: userProfile.displayName || user?.displayName || "", shippingName: userProfile.defaultShippingAddress?.name || "", shippingEmail: userProfile.defaultShippingAddress?.email || "", shippingAddress: userProfile.defaultShippingAddress?.address || "", shippingCity: userProfile.defaultShippingAddress?.city || "", shippingPostalCode: userProfile.defaultShippingAddress?.postalCode || "", shippingPhone: userProfile.defaultShippingAddress?.phone || "", }); } }, [userProfile, user, editProfileForm, isEditProfileDialogOpen]);
+  useEffect(() => {
+    if (userProfile && isEditProfileDialogOpen && !editProfileForm.formState.isDirty) {
+      editProfileForm.reset({
+        displayName: userProfile.displayName || user?.displayName || "",
+        shippingName: userProfile?.defaultShippingAddress?.name || "",
+        shippingEmail: userProfile?.defaultShippingAddress?.email || "",
+        shippingAddress: userProfile?.defaultShippingAddress?.address || "",
+        shippingCity: userProfile?.defaultShippingAddress?.city || "",
+        shippingPostalCode: userProfile?.defaultShippingAddress?.postalCode || "",
+        shippingPhone: userProfile?.defaultShippingAddress?.phone || "",
+      });
+    }
+  }, [userProfile, user, isEditProfileDialogOpen, editProfileForm]); 
 
-  useEffect(() => { prevOrdersRef.current = orders; }, [orders]);
+  useEffect(() => { 
+    prevOrdersRef.current = orders; 
+  }, [orders]);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -134,17 +179,39 @@ export default function ProfilePage() {
 
 
   async function onSubmitPasswordChange(data: ChangePasswordFormValues) {
-    try { await updateUserPassword(data.currentPassword, data.newPassword); passwordForm.reset(); setIsPasswordDialogOpen(false); }
-    catch (error) { console.error("Failed to change password from profile page", error) }
+    try { 
+      await updateUserPassword(data.currentPassword, data.newPassword); 
+      passwordForm.reset(); 
+      setIsPasswordDialogOpen(false); 
+    } catch (error) { 
+      console.error("Failed to change password from profile page", error); 
+    }
   }
 
   async function onSubmitEditProfile(data: UpdateUserProfileFormValuesZod) {
-    const mappedData: UpdateUserProfileFormValues = { displayName: data.displayName || '', shippingName: data.shippingName || '', shippingEmail: data.shippingEmail || '', shippingAddress: data.shippingAddress || '', shippingCity: data.shippingCity || '', shippingPostalCode: data.shippingPostalCode || '', shippingPhone: data.shippingPhone || '', };
-    try { await updateUserProfileDetails(mappedData); setIsEditProfileDialogOpen(false); }
-    catch (error) { console.error("Failed to update profile from profile page", error); }
+    const mappedData: UpdateUserProfileFormValues = {
+        displayName: data.displayName || '',
+        shippingName: data.shippingName || '',
+        shippingEmail: data.shippingEmail || '',
+        shippingAddress: data.shippingAddress || '',
+        shippingCity: data.shippingCity || '',
+        shippingPostalCode: data.shippingPostalCode || '',
+        shippingPhone: data.shippingPhone || '',
+    };
+    try { 
+      await updateUserProfileDetails(mappedData); 
+      setIsEditProfileDialogOpen(false); 
+    } catch (error) { 
+      console.error("Failed to update profile from profile page", error);
+    }
   }
 
-  const formatDate = (timestamp: any) => { if (timestamp && timestamp.toDate) { return timestamp.toDate().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } return 'Fecha no disponible'; };
+  const formatDate = (timestamp: any): string => { 
+    if (timestamp && timestamp.toDate) { 
+      return timestamp.toDate().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }); 
+    } 
+    return 'Fecha no disponible'; 
+  };
 
   const getOrderStatusBadgeClass = (status: OrderStatus): string => {
     switch (status) {
@@ -158,7 +225,19 @@ export default function ProfilePage() {
     }
   };
 
-  if (authIsLoading || isLoadingUserProfile || !user || !userProfile) { return ( <div className="flex flex-col justify-center items-center min-h-[calc(100vh-20rem)]"> <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" /> <p className="text-lg text-muted-foreground">Cargando perfil...</p> </div> ); }
+  const OrderTrackingMap = dynamic(() => import('@/components/maps/OrderTrackingMap'), {
+    ssr: false,
+    loading: () => <div className="h-[300px] w-full bg-muted rounded-md flex items-center justify-center my-4"><Loader2 className="animate-spin h-8 w-8 text-primary" /><p className="ml-2">Cargando mapa...</p></div>,
+  });
+
+  if (authIsLoading || isLoadingUserProfile || !user || !userProfile) { 
+    return ( 
+        <div className="flex flex-col justify-center items-center min-h-[calc(100vh-20rem)]"> 
+            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" /> 
+            <p className="text-lg text-muted-foreground">Cargando perfil...</p> 
+        </div> 
+    ); 
+  }
 
   return (
     <div className="container mx-auto py-12 px-4 max-w-4xl">
@@ -203,7 +282,7 @@ export default function ProfilePage() {
 
                           <Accordion type="single" collapsible className="w-full">
                             <AccordionItem value="items"> <AccordionTrigger className="text-base font-semibold">Ver {order.items.length} Artículo(s)</AccordionTrigger>
-                              <AccordionContent> <ul className="space-y-3 pt-2"> {order.items.map((item) => ( <li key={item.id} className="flex items-center justify-between gap-3 p-2 rounded-md bg-muted/20"> <div className="flex items-center gap-3"> <Image src={item.imageUrl} alt={item.name} width={40} height={40} className="rounded object-cover" data-ai-hint={item.dataAiHint}/> <div><p className="font-semibold text-sm">{item.name}</p><p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p></div> </div> <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p> </li> ))} </ul> </AccordionContent>
+                              <AccordionContent> <ul className="space-y-3 pt-2"> {order.items.map((item) => ( <li key={item.id} className="flex items-center justify-between gap-3 p-2 rounded-md bg-muted/20"> <div className="flex items-center gap-3"> <Image src={item.imageUrl} alt={item.name} width={40} height={40} className="rounded object-cover" data-ai-hint={item.dataAiHint || ''}/> <div><p className="font-semibold text-sm">{item.name}</p><p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p></div> </div> <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p> </li> ))} </ul> </AccordionContent>
                             </AccordionItem>
                             <AccordionItem value="shipping"> <AccordionTrigger className="text-base font-semibold">Detalles de Envío</AccordionTrigger>
                               <AccordionContent className="text-sm space-y-1 pt-2"> <p><strong>Nombre:</strong> {order.shippingAddress.name}</p> <p><strong>Email:</strong> {order.shippingAddress.email}</p> <p><strong>Dirección:</strong> {order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.postalCode}</p> {order.shippingAddress.phone && <p><strong>Teléfono:</strong> {order.shippingAddress.phone}</p>} </AccordionContent>
