@@ -74,13 +74,21 @@ const createUserProfileDocument = async (firebaseUser: FirebaseUser) => {
     }
   } else {
     const existingData = userSnap.data() as UserProfile;
-    if (existingData.displayName !== firebaseUser.displayName || existingData.email !== firebaseUser.email) {
+    let needsUpdate = false;
+    const updates: Partial<UserProfile> = { updatedAt: serverTimestamp() };
+
+    if (firebaseUser.displayName && existingData.displayName !== firebaseUser.displayName) {
+        updates.displayName = firebaseUser.displayName;
+        needsUpdate = true;
+    }
+    if (firebaseUser.email && existingData.email !== firebaseUser.email) {
+        updates.email = firebaseUser.email;
+        needsUpdate = true;
+    }
+
+    if (needsUpdate) {
       try {
-        await setDoc(userRef, { 
-          displayName: firebaseUser.displayName || existingData.displayName || '',
-          email: firebaseUser.email || existingData.email,
-          updatedAt: serverTimestamp() 
-        }, { merge: true });
+        await setDoc(userRef, updates, { merge: true });
         console.log("User profile document updated for user:", firebaseUser.uid);
       } catch (error) {
         console.error("Error updating user profile document:", error);
@@ -122,6 +130,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      setIsLoading(true); // Set loading true at the start of auth state change
       if (firebaseUser) {
         const simpleUser = {
           uid: firebaseUser.uid,
@@ -134,8 +143,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       } else {
         setUser(null);
         setUserProfile(null);
+        setIsLoadingUserProfile(false); // Ensure this is false if no user
       }
-      setIsLoading(false);
+      setIsLoading(false); // Set loading false at the end
     });
     return () => unsubscribe();
   }, []);
@@ -168,6 +178,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         if (name) {
           await updateFirebaseProfile(userCredential.user, { displayName: name });
         }
+        // createUserProfileDocument will be called by onAuthStateChanged
       }
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
@@ -186,6 +197,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     setIsLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
+      // createUserProfileDocument and fetchUserProfile will be called by onAuthStateChanged
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Inicio de sesión con Google exitoso", description: `¡Bienvenido, ${result.user.displayName || result.user.email}!` });
@@ -204,6 +216,22 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       }
       setUser(null);
       setUserProfile(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    setIsLoading(true);
+    try {
+      await signOut(auth);
+      setUser(null);
+      setUserProfile(null);
+      router.push('/');
+      toast({ title: "Cierre de sesión exitoso", description: "Has cerrado sesión correctamente." });
+    } catch (error: any) {
+      console.error("Error during logout:", error);
+      toast({ title: "Error al cerrar sesión", description: error.message || "No se pudo cerrar la sesión.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -236,7 +264,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     if (!firebaseUser || !firebaseUser.email) {
       toast({ title: "Error", description: "Usuario no encontrado o sin email.", variant: "destructive" });
       setIsLoading(false);
-      return;
+      throw new Error("User not found or email missing");
     }
 
     try {
@@ -288,3 +316,4 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     </React.Suspense>
   );
 };
+
