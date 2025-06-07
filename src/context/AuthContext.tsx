@@ -16,6 +16,7 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
   updatePassword as firebaseUpdatePassword,
+  sendEmailVerification,
   type User as FirebaseUser
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore'; 
@@ -32,6 +33,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   updateUserPassword: (currentPassword: string, newPassword: string) => Promise<void>;
   updateUserProfileDetails: (data: UpdateUserProfileFormValues) => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
   isLoading: boolean;
   fetchUserProfile: (uid: string) => Promise<void>; 
 }
@@ -57,13 +59,14 @@ const createUserProfileDocument = async (firebaseUser: FirebaseUser) => {
   const userSnap = await getDoc(userRef);
 
   if (!userSnap.exists()) {
-    const { uid, email, displayName } = firebaseUser;
+    const { uid, email, displayName, emailVerified } = firebaseUser;
     const createdAt = serverTimestamp();
     try {
       await setDoc(userRef, {
         uid,
         email,
         displayName: displayName || '',
+        emailVerified,
         createdAt,
         updatedAt: createdAt,
         defaultShippingAddress: null,
@@ -84,6 +87,10 @@ const createUserProfileDocument = async (firebaseUser: FirebaseUser) => {
     }
     if (firebaseUser.email && existingData.email !== firebaseUser.email) {
         updates.email = firebaseUser.email;
+        needsUpdate = true;
+    }
+    if (existingData.emailVerified !== firebaseUser.emailVerified) {
+        updates.emailVerified = firebaseUser.emailVerified;
         needsUpdate = true;
     }
 
@@ -117,8 +124,6 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         setUserProfile(docSnap.data() as UserProfile);
       } else {
         console.log("No user profile found in Firestore for UID:", uid);
-        // Potentially create it here if it's absolutely missing post-login/signup
-        // For now, we assume createUserProfileDocument handles initial creation.
         setUserProfile(null); 
       }
     } catch (error) {
@@ -139,6 +144,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           providerData: firebaseUser.providerData.map(pd => ({ providerId: pd.providerId })),
+          emailVerified: firebaseUser.emailVerified,
         };
         setUser(simpleUser);
         await createUserProfileDocument(firebaseUser); 
@@ -175,8 +181,12 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      if (userCredential.user && name) {
-          await updateFirebaseProfile(userCredential.user, { displayName: name });
+      if (userCredential.user) {
+          if (name) {
+            await updateFirebaseProfile(userCredential.user, { displayName: name });
+          }
+          await sendEmailVerification(userCredential.user);
+          toast({ title: "Verifica tu correo", description: "Se ha enviado un correo de verificación a tu dirección. Por favor, revisa tu bandeja de entrada." });
           // Firestore document will be updated/created by onAuthStateChanged logic
       }
       const redirect = searchParams.get('redirect');
@@ -200,7 +210,6 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       toast({ title: "Inicio de sesión con Google exitoso", description: `¡Bienvenido, ${result.user.displayName || result.user.email}!` });
     } catch (error: any) {
       console.error("Error during Google login:", error);
-      // Error handling logic...
       let errorMessage = "No se pudo iniciar sesión con Google.";
       if (error.code === 'auth/popup-closed-by-user') {
         errorMessage = "El proceso de inicio de sesión con Google fue cancelado.";
@@ -221,7 +230,8 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     setIsLoading(true);
     try {
       await signOut(auth);
-      // onAuthStateChanged will set user and userProfile to null
+      setUser(null);
+      setUserProfile(null);
       router.push('/');
       toast({ title: "Cierre de sesión exitoso", description: "Has cerrado sesión correctamente." });
     } catch (error: any) {
@@ -292,41 +302,42 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     }
 
     try {
-      // Update Firebase Auth display name if changed
       if (data.displayName !== firebaseUser.displayName) {
         await updateFirebaseProfile(firebaseUser, { displayName: data.displayName });
       }
 
-      // Prepare Firestore updates
       const userRef = doc(db, "users", firebaseUser.uid);
       const updates: Partial<UserProfile> = {
         displayName: data.displayName,
         updatedAt: serverTimestamp(),
       };
 
-      const newShippingAddress: ShippingAddressDetails = {
-        name: data.shippingName,
-        email: data.shippingEmail,
-        address: data.shippingAddress,
-        city: data.shippingCity,
-        postalCode: data.shippingPostalCode,
-        phone: data.shippingPhone || '',
-      };
-      updates.defaultShippingAddress = newShippingAddress;
+      if (data.shippingName && data.shippingEmail && data.shippingAddress && data.shippingCity && data.shippingPostalCode) {
+        const newShippingAddress: ShippingAddressDetails = {
+          name: data.shippingName,
+          email: data.shippingEmail,
+          address: data.shippingAddress,
+          city: data.shippingCity,
+          postalCode: data.shippingPostalCode,
+          phone: data.shippingPhone || '',
+        };
+        updates.defaultShippingAddress = newShippingAddress;
+      } else {
+         updates.defaultShippingAddress = null;
+      }
       
       if (data.paymentLast4Digits && data.paymentExpiryDate) {
         const newPaymentMethod: SimulatedPaymentMethod = {
-            last4Digits: data.paymentLast4Digits.slice(-4), // Ensure only last 4
+            last4Digits: data.paymentLast4Digits.slice(-4),
             expiryDate: data.paymentExpiryDate,
         };
         updates.defaultPaymentMethod = newPaymentMethod;
       } else {
-        updates.defaultPaymentMethod = null; // Clear if fields are empty
+        updates.defaultPaymentMethod = null;
       }
 
-
       await updateDoc(userRef, updates);
-      await fetchUserProfile(firebaseUser.uid); // Refresh local profile state
+      await fetchUserProfile(firebaseUser.uid); 
 
       toast({ title: "Perfil Actualizado", description: "Tu información ha sido actualizada correctamente." });
     } catch (error: any) {
@@ -334,6 +345,38 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       toast({ title: "Error al Actualizar Perfil", description: error.message || "No se pudo actualizar tu información.", variant: "destructive" });
       throw error;
     } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendVerificationEmail = async () => {
+    setIsLoading(true);
+    const firebaseUser = auth.currentUser;
+    if (firebaseUser && !firebaseUser.emailVerified) {
+      try {
+        await sendEmailVerification(firebaseUser);
+        toast({
+          title: "Correo de verificación reenviado",
+          description: "Por favor, revisa tu bandeja de entrada.",
+        });
+      } catch (error: any) {
+        console.error("Error resending verification email:", error);
+        toast({
+          title: "Error",
+          description: "No se pudo reenviar el correo de verificación. Inténtalo más tarde.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    } else if (firebaseUser && firebaseUser.emailVerified) {
+       toast({
+          title: "Correo ya verificado",
+          description: "Tu correo electrónico ya ha sido verificado.",
+        });
+       setIsLoading(false);
+    } else {
+      toast({ title: "Error", description: "Usuario no encontrado.", variant: "destructive" });
       setIsLoading(false);
     }
   };
@@ -351,6 +394,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         resetPassword,
         updateUserPassword,
         updateUserProfileDetails,
+        resendVerificationEmail,
         isLoading,
         fetchUserProfile,
       }}

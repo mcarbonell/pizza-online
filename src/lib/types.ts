@@ -37,14 +37,15 @@ export interface User {
   uid: string;        
   email: string | null; 
   displayName?: string | null; 
-  // Firebase User object also has providerData
   providerData?: Array<{ providerId: string }>;
+  emailVerified?: boolean;
 }
 
 export interface UserProfile {
   uid: string;
   email: string | null;
   displayName?: string | null;
+  emailVerified?: boolean;
   defaultShippingAddress?: ShippingAddressDetails | null; 
   defaultPaymentMethod?: SimulatedPaymentMethod | null;
   createdAt: any; 
@@ -74,3 +75,4 @@ export interface UpdateUserProfileFormValues {
   paymentLast4Digits: string;
   paymentExpiryDate: string;
 }
+

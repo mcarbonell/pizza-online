@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, CreditCardIcon, KeyRound, AlertTriangle } from 'lucide-react';
+import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, CreditCardIcon, KeyRound, AlertTriangle, MailCheck, MailWarning } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import type { Order, UpdateUserProfileFormValues, ShippingAddressDetails, SimulatedPaymentMethod } from '@/lib/types'; 
@@ -22,6 +22,7 @@ import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "La contraseña actual es requerida."),
@@ -50,7 +51,7 @@ const updateUserProfileSchema = z.object({
   paymentExpiryDate: z.string()
     .regex(/^(0[1-9]|1[0-2])\/\d{2}$/, "La fecha de caducidad debe ser MM/AA.")
     .optional().or(z.literal('')),
-}).refine(data => { // Conditional validation: if one shipping field is present, all main ones are required
+}).refine(data => { 
   const shippingFields = [data.shippingName, data.shippingEmail, data.shippingAddress, data.shippingCity, data.shippingPostalCode];
   const paymentFields = [data.paymentLast4Digits, data.paymentExpiryDate];
 
@@ -60,13 +61,19 @@ const updateUserProfileSchema = z.object({
   const somePaymentPresent = paymentFields.some(field => field && field.length > 0);
   const allRequiredPaymentPresent = data.paymentLast4Digits && data.paymentExpiryDate;
   
-  if (someShippingPresent && !allRequiredShippingPresent) return false;
-  if (somePaymentPresent && !allRequiredPaymentPresent) return false;
+  if (someShippingPresent && (!allRequiredShippingPresent && (
+        !data.shippingName || !data.shippingEmail || !data.shippingAddress || !data.shippingCity || !data.shippingPostalCode
+    ))) {
+        return false;
+    }
+  if (somePaymentPresent && (!allRequiredPaymentPresent && (!data.paymentLast4Digits || !data.paymentExpiryDate))) {
+     return false;
+  }
   
   return true;
 }, {
   message: "Si se proporciona un detalle de envío o pago, todos sus campos principales son requeridos (excepto teléfono de envío).",
-  path: ["shippingName"], // Path to one of the fields to show general error
+  path: ["shippingName"], 
 });
 
 type UpdateUserProfileFormValuesZod = z.infer<typeof updateUserProfileSchema>;
@@ -79,6 +86,7 @@ export default function ProfilePage() {
     logout, 
     updateUserPassword, 
     updateUserProfileDetails,
+    resendVerificationEmail,
     isLoading: authIsLoading, 
     isLoadingUserProfile 
   } = useAuth(); 
@@ -112,7 +120,7 @@ export default function ProfilePage() {
   }, [user, authIsLoading, router]);
   
   useEffect(() => {
-    if (userProfile && !editProfileForm.formState.isDirty) {
+    if (userProfile && isEditProfileDialogOpen && !editProfileForm.formState.isDirty) {
       editProfileForm.reset({
         displayName: userProfile.displayName || "",
         shippingName: userProfile.defaultShippingAddress?.name || "",
@@ -162,9 +170,8 @@ export default function ProfilePage() {
   }
 
   async function onSubmitEditProfile(data: UpdateUserProfileFormValuesZod) {
-    // Map Zod schema to the type expected by AuthContext
     const mappedData: UpdateUserProfileFormValues = {
-      displayName: data.displayName,
+      displayName: data.displayName || '',
       shippingName: data.shippingName || '',
       shippingEmail: data.shippingEmail || '',
       shippingAddress: data.shippingAddress || '',
@@ -183,7 +190,7 @@ export default function ProfilePage() {
   }
 
 
-  if (authIsLoading || isLoadingUserProfile || !user) { 
+  if (authIsLoading || isLoadingUserProfile || !user || !userProfile) { 
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-20rem)]">
         <p className="text-lg text-muted-foreground">Cargando perfil...</p>
@@ -203,6 +210,18 @@ export default function ProfilePage() {
 
   return (
     <div className="container mx-auto py-12 px-4 max-w-4xl">
+      {user && !user.emailVerified && hasPasswordProvider && (
+        <Alert variant="default" className="mb-6 bg-yellow-50 border-yellow-300 text-yellow-700">
+          <MailWarning className="h-5 w-5 text-yellow-600" />
+          <AlertTitle className="font-semibold text-yellow-800">Verifica tu correo electrónico</AlertTitle>
+          <AlertDescription>
+            Tu dirección de correo electrónico aún no ha sido verificada. Por favor, revisa tu bandeja de entrada para el correo de verificación.
+            <Button variant="link" className="p-0 h-auto ml-1 text-yellow-700 hover:text-yellow-800" onClick={resendVerificationEmail} disabled={authIsLoading}>
+              Reenviar correo
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       <Card className="shadow-xl mb-12">
         <CardHeader className="text-center">
           <UserCircle className="mx-auto h-24 w-24 text-primary mb-4" />
@@ -212,12 +231,23 @@ export default function ProfilePage() {
         <CardContent className="space-y-6">
           <div className="space-y-3">
             {userProfile?.email && (
-              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                <Mail className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Correo Electrónico</p>
-                  <p className="text-md font-semibold">{userProfile.email}</p>
+              <div className="flex items-center justify-between gap-3 p-3 bg-muted/30 rounded-lg">
+                <div className="flex items-center gap-3">
+                    <Mail className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Correo Electrónico</p>
+                      <p className="text-md font-semibold">{userProfile.email}</p>
+                    </div>
                 </div>
+                {user.emailVerified ? (
+                    <Badge variant="default" className="bg-green-100 text-green-700 border-green-300 hover:bg-green-100">
+                        <MailCheck className="mr-1.5 h-4 w-4" /> Verificado
+                    </Badge>
+                ) : (
+                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-100">
+                        <MailWarning className="mr-1.5 h-4 w-4" /> No Verificado
+                    </Badge>
+                )}
               </div>
             )}
              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
@@ -227,7 +257,7 @@ export default function ProfilePage() {
                     <p className="text-md font-semibold break-all">{user.uid}</p>
                 </div>
             </div>
-            {userProfile?.defaultShippingAddress && (
+            {userProfile?.defaultShippingAddress && (userProfile.defaultShippingAddress.name || userProfile.defaultShippingAddress.address) && (
               <Card className="mt-4">
                 <CardHeader>
                   <CardTitle className="text-lg font-headline flex items-center gap-2"><Home className="h-5 w-5"/> Dirección de Envío Predeterminada</CardTitle>
@@ -240,7 +270,7 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
             )}
-            {userProfile?.defaultPaymentMethod && (
+            {userProfile?.defaultPaymentMethod && userProfile.defaultPaymentMethod.last4Digits && (
               <Card className="mt-4">
                 <CardHeader>
                   <CardTitle className="text-lg font-headline flex items-center gap-2"><CreditCardIcon className="h-5 w-5"/> Método de Pago Predeterminado (Simulado)</CardTitle>
@@ -271,7 +301,6 @@ export default function ProfilePage() {
                     <ScrollArea className="max-h-[60vh] p-1 pr-5">
                     <Form {...editProfileForm}>
                         <form onSubmit={editProfileForm.handleSubmit(onSubmitEditProfile)} className="space-y-6 py-4">
-                            {/* Display Name */}
                             <FormField
                                 control={editProfileForm.control}
                                 name="displayName"
@@ -321,7 +350,6 @@ export default function ProfilePage() {
               <TooltipProvider>
                 <Tooltip open={!hasPasswordProvider ? undefined : false }>
                   <TooltipTrigger asChild>
-                    {/* The button needs to be wrapped for TooltipTrigger when disabled */}
                     <span tabIndex={hasPasswordProvider ? -1 : 0}> 
                       <Button variant="outline" disabled={!hasPasswordProvider} onClick={() => hasPasswordProvider && setIsPasswordDialogOpen(true)}>
                         <ShieldCheck /> Cambiar Contraseña
