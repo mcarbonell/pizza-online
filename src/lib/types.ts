@@ -1,15 +1,16 @@
 
+export type ProductCategory = 'Pizzas' | 'Sides' | 'Drinks' | 'Desserts';
+
 export interface Product {
-  id: string; // Firestore document ID
+  id: string; 
   name: string;
   description: string;
   price: number;
   imageUrl: string;
-  category: 'Pizzas' | 'Sides' | 'Drinks' | 'Desserts' | 'Hamburguesas' | 'Sandwiches' | 'Kebabs' | 'Raciones';
+  category: ProductCategory;
   dataAiHint: string;
 }
 
-// Type for the initial product data, an ID is not needed here as Firestore will generate it.
 export type ProductSeedData = Omit<Product, 'id'>;
 
 
@@ -17,9 +18,8 @@ export interface CartItem extends Product {
   quantity: number;
 }
 
-// Simplified cart item structure for Stripe metadata
 export interface SimplifiedCartItem {
-  id: string; // Product ID
+  id: string; 
   quantity: number;
 }
 
@@ -56,16 +56,23 @@ export interface UserProfile {
   updatedAt: any; 
 }
 
+export type OrderStatus = 'Pending' | 'Processing' | 'Out for Delivery' | 'Shipped' | 'Delivered' | 'Cancelled' | 'PaymentFailed';
+
 export interface Order {
   id?: string; 
   userId: string;
-  items: CartItem[]; // Items will be fully detailed Product objects + quantity
+  items: CartItem[]; 
   totalAmount: number;
   shippingAddress: ShippingAddressDetails; 
   paymentDetails: PaymentDetails; 
   createdAt: any; 
-  updatedAt?: any; // Added for tracking status updates
-  status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'PaymentFailed'; 
+  updatedAt?: any; 
+  status: OrderStatus; 
+  deliveryLocation?: {
+    latitude: number;
+    longitude: number;
+    timestamp: any; // Firestore serverTimestamp
+  } | null;
 }
 
 export interface UpdateUserProfileFormValues {
@@ -78,3 +85,9 @@ export interface UpdateUserProfileFormValues {
   shippingPhone?: string;
 }
 
+// This type was used for defaultPaymentMethod in UserProfile which is currently not actively used.
+// If defaultPaymentMethod is re-introduced, this type can be used.
+// export interface SimulatedPaymentMethod {
+//   last4Digits: string;
+//   expiryDate: string; // e.g., "MM/YY"
+// }

@@ -4,7 +4,7 @@ Este documento describe la arquitectura de la aplicación web Pizzería Serranil
 
 ## 1. Visión General
 
-Pizzería Serranillo es una aplicación web moderna de comercio electrónico, enfocada en pedidos de pizza en línea. Está construida utilizando Next.js con el App Router, React para la interfaz de usuario, y Tailwind CSS junto con ShadCN UI para el diseño y los componentes. La gestión del estado del carrito se maneja a través de React Context y persiste en el Local Storage del navegador. La autenticación se realiza con Firebase Auth, los datos se almacenan en Firestore y los pagos se procesan con Stripe. Genkit está integrado para futuras funcionalidades de Inteligencia Artificial. La aplicación también está configurada como una Progressive Web App (PWA).
+Pizzería Serranillo es una aplicación web moderna de comercio electrónico, enfocada en pedidos de pizza en línea. Está construida utilizando Next.js con el App Router, React para la interfaz de usuario, y Tailwind CSS junto con ShadCN UI para el diseño y los componentes. La gestión del estado del carrito se maneja a través de React Context y persiste en el Local Storage del navegador. La autenticación se realiza con Firebase Auth, los datos se almacenan en Firestore y los pagos se procesan con Stripe. Genkit está integrado para futuras funcionalidades de Inteligencia Artificial. La aplicación también está configurada como una Progressive Web App (PWA) y cuenta con una funcionalidad simplificada de seguimiento de pedidos en tiempo real.
 
 ## 2. Pila Tecnológica (Tech Stack)
 
@@ -21,6 +21,8 @@ Pizzería Serranillo es una aplicación web moderna de comercio electrónico, en
     - _Razón:_ Framework CSS de utilidad primero que permite un desarrollo rápido y un diseño altamente personalizable sin escribir CSS tradicional.
 - **Iconos:** Lucide React
     - _Razón:_ Biblioteca de iconos SVG ligera, personalizable y fácil de usar.
+- **Mapas:** Leaflet con React-Leaflet
+    - _Razón:_ Biblioteca de mapas interactivos de código abierto, ligera y flexible. Usada para el seguimiento de pedidos.
 - **PWA:** `next-pwa`
     - _Razón:_ Facilita la creación de Progressive Web Apps con Next.js.
 
@@ -28,7 +30,7 @@ Pizzería Serranillo es una aplicación web moderna de comercio electrónico, en
 - **Autenticación:** Firebase Authentication
     - _Razón:_ Solución robusta y fácil de integrar para múltiples proveedores de identidad (Email/Password, Google).
 - **Base de Datos:** Firestore (Firebase)
-    - _Razón:_ Base de datos NoSQL escalable, en tiempo real, bien integrada con Firebase Auth y otros servicios de Firebase. Utilizada para productos, perfiles de usuario y pedidos.
+    - _Razón:_ Base de datos NoSQL escalable, en tiempo real, bien integrada con Firebase Auth y otros servicios de Firebase. Utilizada para productos, perfiles de usuario, pedidos y ubicaciones de reparto.
 - **Almacenamiento de Archivos:** Firebase Storage
     - _Razón:_ Para almacenar imágenes de productos.
 - **Pasarela de Pago:** Stripe
@@ -41,6 +43,7 @@ Pizzería Serranillo es una aplicación web moderna de comercio electrónico, en
     - _Razón:_ Permite que el carrito del usuario persista entre sesiones en el mismo navegador, mejorando la UX.
 - **Estado de Autenticación:** React Context API (`AuthContext`)
     - _Razón:_ Para gestionar el estado del usuario autenticado y su perfil de Firestore a través de la aplicación.
+- **Estado de Ubicación (Repartidor):** Gestionado en el panel de admin (`AdminPage`) usando `navigator.geolocation` y almacenado en Firestore.
 
 ### 2.4. Formularios y Validación
 - **Gestión de Formularios:** React Hook Form
@@ -71,89 +74,65 @@ La estructura de directorios principal dentro de `src/` es la siguiente:
     - `page.tsx`: Página de inicio (menú de productos).
     - `checkout/page.tsx`: Página de checkout.
     - `checkout/success/page.tsx`, `checkout/cancel/page.tsx`: Páginas de resultado de Stripe.
-    - `profile/page.tsx`: Página de perfil del usuario.
-    - `admin/page.tsx`: Panel de administración.
+    - `profile/page.tsx`: Página de perfil del usuario (incluye visualización de mapa para seguimiento).
+    - `admin/page.tsx`: Panel de administración (incluye lógica para iniciar/detener seguimiento GPS).
     - `login/page.tsx`, `signup/page.tsx`, `forgot-password/page.tsx`: Páginas de autenticación.
     - `api/stripe/`: API routes para la integración con Stripe (crear sesión, webhook).
     - `globals.css`: Estilos globales y variables de tema de ShadCN/Tailwind.
 - **`src/components/`**: Componentes reutilizables de React.
     - `ui/`: Componentes de ShadCN UI (auto-generados o personalizados).
-    - `cart/`: Componentes relacionados con el carrito de compras (ej. `CartSidebar.tsx`, `CartItemCard.tsx`).
-    - `checkout/`: Componentes para el proceso de checkout (ej. `CheckoutForm.tsx`).
-    - `layout/`: Componentes estructurales (ej. `Header.tsx`, `Footer.tsx` - aunque el footer está en `layout.tsx`).
-    - `products/`: Componentes para mostrar productos (ej. `ProductCard.tsx`).
-    - `icons/`: Componentes de iconos personalizados (ej. `PizzaPlaceLogo.tsx` ahora `PizzeríaSerranilloLogo`).
-- **`src/context/`**: Proveedores de React Context (ej. `CartContext.tsx`, `AuthContext.tsx`).
-- **`src/data/`**: Datos estáticos de la aplicación (ej. `products.ts` para importación).
-- **`src/hooks/`**: Hooks personalizados de React (ej. `useToast.ts`, `useMobile.ts`).
+    - `cart/`: Componentes relacionados con el carrito de compras.
+    - `checkout/`: Componentes para el proceso de checkout.
+    - `layout/`: Componentes estructurales.
+    - `products/`: Componentes para mostrar productos.
+    - `icons/`: Componentes de iconos personalizados.
+    - `maps/`: Componentes relacionados con mapas (ej. `OrderTrackingMap.tsx`).
+- **`src/context/`**: Proveedores de React Context.
+- **`src/data/`**: Datos estáticos de la aplicación.
+- **`src/hooks/`**: Hooks personalizados de React.
 - **`src/lib/`**: Funciones de utilidad y definiciones de tipos.
-    - `utils.ts`: Funciones de utilidad genéricas (ej. `cn` para classnames).
-    - `types.ts`: Definiciones de interfaces y tipos de TypeScript.
     - `firebase.ts`: Configuración e inicialización de Firebase.
-    - `stripe.ts`: Configuración de Stripe (frontend y backend).
+    - `stripe.ts`: Configuración de Stripe.
+    - `types.ts`: Definiciones de interfaces y tipos.
+    - `utils.ts`: Funciones de utilidad genéricas.
 - **`src/ai/`**: Lógica relacionada con Inteligencia Artificial utilizando Genkit.
-    - `genkit.ts`: Configuración e inicialización de Genkit.
-    - `dev.ts`: Archivo para desarrollo y prueba de flujos Genkit.
-    - `flows/`: (Directorio futuro para los flujos de Genkit).
-- **`docs/`**: Documentación del proyecto (este archivo, TODO, DONE, BUGS).
+- **`docs/`**: Documentación del proyecto.
 - **`public/`**: Archivos estáticos servidos públicamente.
     - `manifest.json`: Manifiesto para la PWA.
     - `icons/`: Iconos para la PWA.
+    - `leaflet/`: Iconos necesarios para Leaflet (marker-icon.png, etc.).
 
 ## 4. Flujo de Datos y Lógica de Negocio Clave
 
-### 4.1. Autenticación de Usuarios
-1. `AuthContext` gestiona el estado del usuario usando Firebase Auth.
-2. `Firebase.ts` inicializa Firebase.
-3. Las páginas de Login/Signup usan métodos del `AuthContext` que llaman a funciones de Firebase Auth.
-4. Perfiles de usuario (`UserProfile`) se crean/actualizan en Firestore (`users` collection) al registrarse o iniciar sesión.
+(Se mantienen las secciones anteriores: Autenticación, Visualización de Productos, Gestión del Carrito, Proceso de Checkout, Gestión de Productos (Admin), Notificaciones de Estado de Pedido).
 
-### 4.2. Visualización de Productos
-1. `HomePage` (`src/app/page.tsx`) obtiene productos de Firestore (colección `products`).
-2. Filtra y muestra productos usando `ProductCard`.
-
-### 4.3. Gestión del Carrito (`CartContext`)
-1. Persiste en Local Storage.
-2. Funciones para añadir, eliminar, actualizar cantidad, limpiar carrito.
-
-### 4.4. Proceso de Checkout y Pago con Stripe
-1. `CheckoutPage` muestra `CheckoutForm` y resumen del pedido.
-2. `CheckoutForm` recoge datos de envío.
-3. Al enviar, se llama a `/api/stripe/create-checkout-session` con los ítems del carrito, ID de usuario y dirección de envío.
-4. Esta API route crea una sesión de Stripe Checkout y devuelve el ID de sesión.
-5. El frontend redirige al usuario a la página de pago de Stripe.
-6. **Webhook de Stripe (`/api/stripe/webhook`):**
-   - Recibe eventos de Stripe (ej. `checkout.session.completed`).
-   - Verifica la firma del webhook.
-   - Si `checkout.session.completed`:
-     - Obtiene los metadatos (ID de usuario, ítems del carrito simplificados, dirección de envío).
-     - **Idempotencia:** Verifica si el pedido ya fue procesado para este `payment_intent`.
-     - Recupera detalles completos de los productos desde Firestore.
-     - Crea un nuevo documento de pedido en la colección `orders` de Firestore.
-     - El carrito del usuario **no** se limpia aquí directamente; se limpia en el cliente al llegar a la página de éxito, o si el usuario vuelve a la app y `CartContext` se recarga. La limpieza del carrito del cliente se realiza en `src/app/checkout/success/page.tsx` al detectar el `session_id`.
-7. `CheckoutSuccessPage` limpia el carrito local del usuario.
-8. `CheckoutCancelPage` maneja cancelaciones.
-
-### 4.5. Gestión de Productos (Admin Panel)
-1. `AdminPage` (`/admin`) es una ruta protegida (rol 'admin' en Firestore).
-2. Permite CRUD de productos en Firestore, incluyendo subida/eliminación de imágenes a Firebase Storage.
-3. Permite importar menú inicial desde `src/data/products.ts`.
-4. Permite ver pedidos y cambiar su estado.
-5. Permite ver usuarios y cambiar su rol.
-
-### 4.6. Notificaciones de Estado de Pedido (Simuladas en Perfil)
-1. `AdminPage` actualiza el estado del pedido y el campo `updatedAt` en Firestore.
-2. `ProfilePage` usa `onSnapshot` para escuchar cambios en los pedidos del usuario.
-3. Si el estado de un pedido cambia (y no es la carga inicial), se muestra un `toast` al usuario.
+### 4.7. Seguimiento de Pedidos en Tiempo Real (Simplificado)
+1.  **Panel de Admin (`AdminPage`):**
+    *   Cuando el administrador cambia el estado de un pedido a "Out for Delivery".
+    *   Se utiliza `navigator.geolocation.watchPosition` para obtener la ubicación del dispositivo del administrador.
+    *   Las coordenadas (latitud, longitud) y un `serverTimestamp` se actualizan en el campo `deliveryLocation` del documento del pedido en Firestore.
+    *   El seguimiento se detiene (`clearWatch`) y `deliveryLocation` se pone a `null` cuando el pedido cambia a otro estado (ej. "Delivered", "Cancelled").
+    *   El administrador debe conceder permisos de ubicación en su navegador. El seguimiento depende de que la pestaña del navegador esté activa.
+2.  **Perfil del Cliente (`ProfilePage`):**
+    *   Escucha cambios en tiempo real en los pedidos del usuario mediante `onSnapshot`.
+    *   Si un pedido tiene el estado "Out for Delivery" y `deliveryLocation` no es nulo:
+        *   Se renderiza un componente de mapa (`OrderTrackingMap`).
+        *   El mapa muestra un marcador en la `latitude` y `longitude` de `deliveryLocation`.
+        *   El marcador se actualiza cuando `deliveryLocation` cambia en Firestore.
+3.  **Componente de Mapa (`OrderTrackingMap`):**
+    *   Utiliza `react-leaflet` para mostrar un mapa de OpenStreetMap.
+    *   Se carga dinámicamente para evitar problemas de SSR.
+    *   Muestra un marcador en la posición proporcionada.
 
 ## 5. Estilo y Tematización
 - **`src/app/globals.css`**: Define variables CSS HSL para los colores del tema.
 - **`tailwind.config.ts`**: Configura Tailwind CSS.
 - Componentes de ShadCN UI en `src/components/ui/`.
+- CSS de Leaflet importado en `ProfilePage` para el mapa.
 
 ## 6. Consideraciones y Futuras Mejoras
 - Ver `docs/TODO.md` para la lista completa.
-- Las notificaciones push reales (FCM) son una mejora futura.
+- La fiabilidad del seguimiento GPS en segundo plano en PWA es limitada. Una app nativa/híbrida para repartidores sería más robusta para esta función.
 - Pruebas unitarias y de integración.
 
 Este documento proporciona una visión general de la arquitectura actual. Se actualizará a medida que el proyecto evolucione.

@@ -1,15 +1,15 @@
 
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus, ClipboardList, RefreshCcw, Users, UserCheck, UserCog } from 'lucide-react';
+import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus, ClipboardList, RefreshCcw, Users, UserCheck, UserCog, MapPin, PlayCircle, StopCircle } from 'lucide-react';
 import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, query, orderBy, writeBatch, doc, updateDoc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import type { Product, Order, UserProfile } from '@/lib/types';
+import type { Product, Order, UserProfile, ProductCategory, OrderStatus } from '@/lib/types';
 import { initialProductData } from '@/data/products';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from "react-hook-form";
@@ -57,8 +57,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const productCategories = ['Pizzas', 'Sides', 'Drinks', 'Desserts'] as const;
-const orderStatuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'] as const;
+const productCategories: ProductCategory[] = ['Pizzas', 'Sides', 'Drinks', 'Desserts'];
+const orderStatuses: OrderStatus[] = ['Pending', 'Processing', 'Out for Delivery', 'Shipped', 'Delivered', 'Cancelled', 'PaymentFailed'];
 const userRoles = ['user', 'admin'] as const;
 const DEFAULT_PLACEHOLDER_IMAGE = 'https://placehold.co/600x400.png';
 
@@ -73,8 +73,8 @@ const productFormSchema = z.object({
     },
     z.number({ invalid_type_error: "El precio debe ser un número."}).positive({ message: "El precio debe ser un número positivo." })
   ),
-  category: z.enum(productCategories, {
-    errorMap: () => ({ message: "Por favor selecciona una categoría válida." }),
+  category: z.custom<ProductCategory>((val) => productCategories.includes(val as ProductCategory), {
+    message: "Por favor selecciona una categoría válida.",
   }),
   imageUrl: z.string().url({ message: "Se requiere una URL de imagen válida." }).optional().or(z.literal('')),
   dataAiHint: z.string().max(30, "La pista de IA no debe exceder los 30 caracteres.").optional(),
@@ -88,7 +88,6 @@ export default function AdminPage() {
   const router = useRouter();
   const { toast } = useToast();
   
-  // Product States
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [productError, setProductError] = useState<string | null>(null);
@@ -104,36 +103,30 @@ export default function AdminPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
-  // Order States
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [isUpdatingOrderStatus, setIsUpdatingOrderStatus] = useState(false);
-
-  // User Management States
+  
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [userManagementError, setUserManagementError] = useState<string | null>(null);
   const [isUpdatingUserRole, setIsUpdatingUserRole] = useState(false);
 
+  const activeWatchIdsRef = useRef<Record<string, number>>({});
+
 
   const editForm = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
-    defaultValues: {
-      name: "", description: "", price: 0, category: "Pizzas", imageUrl: "", dataAiHint: "",
-    },
+    defaultValues: { name: "", description: "", price: 0, category: "Pizzas", imageUrl: "", dataAiHint: "", },
   });
 
   const addForm = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
-    defaultValues: {
-      name: "", description: "", price: 0, category: "Pizzas", imageUrl: DEFAULT_PLACEHOLDER_IMAGE, dataAiHint: "",
-    },
+    defaultValues: { name: "", description: "", price: 0, category: "Pizzas", imageUrl: DEFAULT_PLACEHOLDER_IMAGE, dataAiHint: "", },
   });
 
-  const resetImageStates = () => {
-    setImageFile(null); setImagePreview(null); setUploadProgress(null); setIsUploading(false);
-  };
+  const resetImageStates = () => { setImageFile(null); setImagePreview(null); setUploadProgress(null); setIsUploading(false); };
 
   const fetchProducts = useCallback(async () => {
     setIsLoadingProducts(true); setProductError(null);
@@ -141,12 +134,8 @@ export default function AdminPage() {
       const q = query(collection(db, 'products'), orderBy('category'), orderBy('name'));
       const querySnapshot = await getDocs(q);
       setProducts(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Product)));
-    } catch (err) {
-      console.error("Error fetching products for admin:", err);
-      setProductError("Failed to load products.");
-    } finally {
-      setIsLoadingProducts(false);
-    }
+    } catch (err) { console.error("Error fetching products for admin:", err); setProductError("Failed to load products."); } 
+    finally { setIsLoadingProducts(false); }
   }, []);
 
   const fetchOrders = useCallback(async () => {
@@ -155,12 +144,8 @@ export default function AdminPage() {
       const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
       setOrders(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Order)));
-    } catch (err) {
-      console.error("Error fetching orders for admin:", err);
-      setOrderError("Failed to load orders.");
-    } finally {
-      setIsLoadingOrders(false);
-    }
+    } catch (err) { console.error("Error fetching orders for admin:", err); setOrderError("Failed to load orders."); }
+    finally { setIsLoadingOrders(false); }
   }, []);
 
   const fetchUsers = useCallback(async () => {
@@ -169,41 +154,36 @@ export default function AdminPage() {
       const q = query(collection(db, 'users'), orderBy('email'));
       const querySnapshot = await getDocs(q);
       setAllUsers(querySnapshot.docs.map(docSnap => ({ ...docSnap.data() } as UserProfile)));
-    } catch (err) {
-      console.error("Error fetching users for admin:", err);
-      setUserManagementError("Failed to load users.");
-    } finally {
-      setIsLoadingUsers(false);
-    }
+    } catch (err) { console.error("Error fetching users for admin:", err); setUserManagementError("Failed to load users."); }
+    finally { setIsLoadingUsers(false); }
   }, []);
 
 
   useEffect(() => {
     if (!authIsLoading && !isLoadingUserProfile) {
-      if (!user) {
-        router.push('/login?redirect=/admin');
-      } else if (userProfile && userProfile.role !== 'admin') {
-        router.push('/');
-      } else if (userProfile && userProfile.role === 'admin') {
-        fetchProducts();
-        fetchOrders();
-        fetchUsers();
-      }
+      if (!user) { router.push('/login?redirect=/admin'); } 
+      else if (userProfile && userProfile.role !== 'admin') { router.push('/'); } 
+      else if (userProfile && userProfile.role === 'admin') { fetchProducts(); fetchOrders(); fetchUsers(); }
     }
   }, [user, userProfile, authIsLoading, isLoadingUserProfile, router, fetchProducts, fetchOrders, fetchUsers]);
 
   useEffect(() => {
     if (editingProduct) {
-      editForm.reset({
-        name: editingProduct.name, description: editingProduct.description, price: editingProduct.price,
-        category: editingProduct.category as typeof productCategories[number],
-        imageUrl: editingProduct.imageUrl, dataAiHint: editingProduct.dataAiHint || "",
-      });
+      editForm.reset({ name: editingProduct.name, description: editingProduct.description, price: editingProduct.price, category: editingProduct.category, imageUrl: editingProduct.imageUrl, dataAiHint: editingProduct.dataAiHint || "", });
       setImagePreview(editingProduct.imageUrl || null); resetImageStates();
-    } else {
-       editForm.reset(editForm.formState.defaultValues); 
-    }
+    } else { editForm.reset(editForm.formState.defaultValues); }
   }, [editingProduct, editForm]);
+  
+  // Cleanup geolocation watches on component unmount
+  useEffect(() => {
+    return () => {
+      Object.values(activeWatchIdsRef.current).forEach(watchId => {
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+      });
+      activeWatchIdsRef.current = {};
+    };
+  }, []);
+
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -219,10 +199,8 @@ export default function AdminPage() {
       await batch.commit();
       toast({ title: "Menú Importado", description: `${initialProductData.length} productos importados.` });
       fetchProducts();
-    } catch (error) {
-      console.error("Error importing initial menu:", error);
-      toast({ title: "Error de Importación", description: "No se pudo importar el menú.", variant: "destructive" });
-    } finally { setIsImporting(false); }
+    } catch (error) { console.error("Error importing initial menu:", error); toast({ title: "Error de Importación", description: "No se pudo importar el menú.", variant: "destructive" }); } 
+    finally { setIsImporting(false); }
   };
 
   const handleOpenEditModal = (product: Product) => { setEditingProduct(product); setIsEditModalOpen(true); };
@@ -242,17 +220,14 @@ export default function AdminPage() {
         const imageRef = storageRef(storage, `products/${editingProduct.id}/${imageFile.name}`);
         const uploadTask = uploadBytesResumable(imageRef, imageFile);
         finalImageUrl = await new Promise<string>((resolve, reject) => {
-          uploadTask.on('state_changed', (s) => setUploadProgress((s.bytesTransferred / s.totalBytes) * 100), reject, 
-          async () => resolve(await getDownloadURL(uploadTask.snapshot.ref)));
+          uploadTask.on('state_changed', (s) => setUploadProgress((s.bytesTransferred / s.totalBytes) * 100), reject, async () => resolve(await getDownloadURL(uploadTask.snapshot.ref)));
         });
       }
       await updateDoc(doc(db, 'products', editingProduct.id), { ...formData, price: Number(formData.price), imageUrl: finalImageUrl, updatedAt: serverTimestamp() });
       toast({ title: "Producto Actualizado", description: `"${formData.name}" actualizado.` });
       setIsEditModalOpen(false); setEditingProduct(null); resetImageStates(); fetchProducts();
-    } catch (error) {
-      console.error("Error updating product:", error);
-      toast({ title: "Error al Actualizar", description: "No se pudo actualizar.", variant: "destructive" });
-    } finally { setIsUploading(false); setUploadProgress(null); }
+    } catch (error) { console.error("Error updating product:", error); toast({ title: "Error al Actualizar", description: "No se pudo actualizar.", variant: "destructive" }); } 
+    finally { setIsUploading(false); setUploadProgress(null); }
   };
   
   const handleAddNewProduct = async (formData: ProductFormValues) => {
@@ -264,17 +239,14 @@ export default function AdminPage() {
         const imageRef = storageRef(storage, `products/${newDocRef.id}/${imageFile.name}`);
         const uploadTask = uploadBytesResumable(imageRef, imageFile);
         finalImageUrl = await new Promise<string>((resolve, reject) => {
-          uploadTask.on('state_changed', (s) => setUploadProgress((s.bytesTransferred / s.totalBytes) * 100), reject, 
-          async () => resolve(await getDownloadURL(uploadTask.snapshot.ref)));
+          uploadTask.on('state_changed', (s) => setUploadProgress((s.bytesTransferred / s.totalBytes) * 100), reject, async () => resolve(await getDownloadURL(uploadTask.snapshot.ref)));
         });
       }
       await updateDoc(newDocRef, { imageUrl: finalImageUrl });
       toast({ title: "Producto Añadido", description: `"${formData.name}" añadido.` });
       setIsAddModalOpen(false); resetImageStates(); addForm.reset(); fetchProducts();
-    } catch (error) {
-      console.error("Error adding product:", error);
-      toast({ title: "Error al Añadir", description: "No se pudo añadir.", variant: "destructive" });
-    } finally { setIsUploading(false); setUploadProgress(null); }
+    } catch (error) { console.error("Error adding product:", error); toast({ title: "Error al Añadir", description: "No se pudo añadir.", variant: "destructive" }); }
+    finally { setIsUploading(false); setUploadProgress(null); }
   };
 
   const handleConfirmDelete = async () => {
@@ -283,27 +255,86 @@ export default function AdminPage() {
     try {
       if (productToDelete.imageUrl && productToDelete.imageUrl.includes("firebasestorage.googleapis.com") && productToDelete.imageUrl !== DEFAULT_PLACEHOLDER_IMAGE) {
         try { await deleteObject(storageRef(storage, productToDelete.imageUrl)); } 
-        catch (storageError: any) { 
-          console.warn(`Could not delete image ${productToDelete.imageUrl}:`, storageError);
-          if (storageError.code !== 'storage/object-not-found') {
-            toast({ title: "Advertencia", description: `Imagen no eliminada: ${storageError.message}`, duration: 7000 });
-          }
-        }
+        catch (storageError: any) { console.warn(`Could not delete image ${productToDelete.imageUrl}:`, storageError); if (storageError.code !== 'storage/object-not-found') { toast({ title: "Advertencia", description: `Imagen no eliminada: ${storageError.message}`, duration: 7000 }); } }
       }
       await deleteDoc(doc(db, 'products', productToDelete.id));
       toast({ title: "Producto Eliminado", description: `"${productToDelete.name}" eliminado.` });
       fetchProducts();
-    } catch (error: any) {
-      console.error("Error deleting product:", error);
-      toast({ title: "Error al Eliminar", description: `No se pudo eliminar "${productToDelete.name}".`, variant: "destructive" });
-    } finally { setIsDeletingProduct(false); setIsDeleteAlertOpen(false); setProductToDelete(null); }
+    } catch (error: any) { console.error("Error deleting product:", error); toast({ title: "Error al Eliminar", description: `No se pudo eliminar "${productToDelete.name}".`, variant: "destructive" }); }
+    finally { setIsDeletingProduct(false); setIsDeleteAlertOpen(false); setProductToDelete(null); }
   };
 
-  const handleUpdateOrderStatus = async (orderId: string, newStatus: typeof orderStatuses[number]) => {
+  const startDeliveryTracking = (orderId: string) => {
+    if (!navigator.geolocation) {
+      toast({ title: "Error GPS", description: "Geolocalización no soportada por este navegador.", variant: "destructive" });
+      return;
+    }
+    if (activeWatchIdsRef.current[orderId]) { // Already tracking this order
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          await updateDoc(doc(db, 'orders', orderId), {
+            deliveryLocation: { latitude, longitude, timestamp: serverTimestamp() },
+            updatedAt: serverTimestamp(), // Also update order's general updatedAt
+          });
+          console.log(`Location sent for order ${orderId}: ${latitude}, ${longitude}`);
+        } catch (error) {
+          console.error(`Error updating location for order ${orderId}:`, error);
+          toast({ title: "Error GPS", description: "No se pudo enviar la ubicación.", variant: "destructive" });
+        }
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        let message = "Error al obtener la ubicación.";
+        if (error.code === error.PERMISSION_DENIED) message = "Permiso de ubicación denegado.";
+        else if (error.code === error.POSITION_UNAVAILABLE) message = "Información de ubicación no disponible.";
+        else if (error.code === error.TIMEOUT) message = "Timeout al obtener la ubicación.";
+        toast({ title: "Error GPS", description: message, variant: "destructive" });
+        stopDeliveryTracking(orderId); // Stop if there's an error
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+    activeWatchIdsRef.current = { ...activeWatchIdsRef.current, [orderId]: watchId };
+    toast({ title: "Seguimiento Iniciado", description: `Reparto del pedido #${orderId.substring(0,6)}... en curso.` });
+  };
+
+  const stopDeliveryTracking = async (orderId: string) => {
+    const watchId = activeWatchIdsRef.current[orderId];
+    if (watchId) {
+      navigator.geolocation.clearWatch(watchId);
+      const {[orderId]: _, ...rest} = activeWatchIdsRef.current; // Remove from active watches
+      activeWatchIdsRef.current = rest;
+    }
+    try {
+      await updateDoc(doc(db, 'orders', orderId), {
+        deliveryLocation: null, // Clear location
+        updatedAt: serverTimestamp(),
+      });
+      toast({ title: "Seguimiento Detenido", description: `Seguimiento para pedido #${orderId.substring(0,6)}... finalizado.` });
+    } catch (error) {
+      console.error(`Error clearing location for order ${orderId}:`, error);
+    }
+  };
+
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     setIsUpdatingOrderStatus(true);
+    const orderToUpdate = orders.find(o => o.id === orderId);
+    const oldStatus = orderToUpdate?.status;
+
     try {
       await updateDoc(doc(db, 'orders', orderId), { status: newStatus, updatedAt: serverTimestamp() });
       toast({ title: "Estado del Pedido Actualizado", description: `El pedido #${orderId.substring(0,6)}... ahora está ${newStatus}.` });
+      
+      if (newStatus === 'Out for Delivery') {
+        startDeliveryTracking(orderId);
+      } else if (oldStatus === 'Out for Delivery' && newStatus !== 'Out for Delivery') {
+        await stopDeliveryTracking(orderId); // await to ensure location is cleared before fetching
+      }
+      
       fetchOrders(); 
     } catch (error) {
       console.error("Error updating order status:", error);
@@ -323,12 +354,8 @@ export default function AdminPage() {
       await updateDoc(doc(db, 'users', userIdToUpdate), { role: newRole, updatedAt: serverTimestamp() });
       toast({ title: "Rol de Usuario Actualizado", description: `El rol del usuario ha sido cambiado a ${newRole}.` });
       fetchUsers();
-    } catch (error) {
-      console.error("Error updating user role:", error);
-      toast({ title: "Error al Actualizar Rol", description: "No se pudo actualizar el rol del usuario.", variant: "destructive" });
-    } finally {
-      setIsUpdatingUserRole(false);
-    }
+    } catch (error) { console.error("Error updating user role:", error); toast({ title: "Error al Actualizar Rol", description: "No se pudo actualizar el rol del usuario.", variant: "destructive" }); } 
+    finally { setIsUpdatingUserRole(false); }
   };
 
   const formatDate = (timestamp: any) => {
@@ -336,12 +363,8 @@ export default function AdminPage() {
     return timestamp.toDate ? timestamp.toDate().toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha inválida';
   };
 
-  if (authIsLoading || isLoadingUserProfile) {
-    return <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary mb-4" /><p>Cargando...</p></div>;
-  }
-  if (!user || (userProfile && userProfile.role !== 'admin')) {
-    return <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]"><ShieldAlert className="h-12 w-12 text-destructive mb-4" /><p>Acceso denegado.</p><Button onClick={() => router.push('/')} variant="link">Inicio</Button></div>;
-  }
+  if (authIsLoading || isLoadingUserProfile) { return <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary mb-4" /><p>Cargando...</p></div>; }
+  if (!user || (userProfile && userProfile.role !== 'admin')) { return <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]"><ShieldAlert className="h-12 w-12 text-destructive mb-4" /><p>Acceso denegado.</p><Button onClick={() => router.push('/')} variant="link">Inicio</Button></div>; }
 
   const isAnyActionInProgress = isImporting || isUploading || isDeletingProduct || isUpdatingOrderStatus || isUpdatingUserRole;
 
@@ -395,16 +418,28 @@ export default function AdminPage() {
                   {isLoadingOrders ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando pedidos...</div>)
                   : orderError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{orderError}</AlertDescription></Alert>)
                   : orders.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Pedidos</AlertTitle><AlertDescription>Aún no se han realizado pedidos.</AlertDescription></Alert>)
-                  : (<div className="overflow-x-auto"><Table><TableCaption>Pedidos registrados en Firestore.</TableCaption><TableHeader><TableRow><TableHead>ID Pedido</TableHead><TableHead>Fecha</TableHead><TableHead>Cliente (Email)</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-center">Estado</TableHead></TableRow></TableHeader>
+                  : (<div className="overflow-x-auto"><Table><TableCaption>Pedidos registrados en Firestore.</TableCaption><TableHeader><TableRow><TableHead>ID Pedido</TableHead><TableHead>Fecha</TableHead><TableHead>Cliente (Email)</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-center">Estado</TableHead><TableHead className="text-center">GPS</TableHead></TableRow></TableHeader>
                       <TableBody>{orders.map((order) => (<TableRow key={order.id}><TableCell className="font-mono text-xs">{order.id?.substring(0,8)}...</TableCell><TableCell>{formatDate(order.createdAt)}</TableCell><TableCell>{order.shippingAddress.email}</TableCell><TableCell className="text-right">€{order.totalAmount.toFixed(2)}</TableCell><TableCell className="text-center">
-                        <Select value={order.status} onValueChange={(newStatus) => handleUpdateOrderStatus(order.id!, newStatus as typeof orderStatuses[number])} disabled={isAnyActionInProgress}>
+                        <Select value={order.status} onValueChange={(newStatus) => handleUpdateOrderStatus(order.id!, newStatus as OrderStatus)} disabled={isAnyActionInProgress}>
                             <SelectTrigger className="w-[150px] h-9 text-xs"><SelectValue placeholder="Cambiar estado" /></SelectTrigger>
                             <SelectContent>{orderStatuses.map(status => (<SelectItem key={status} value={status} className="text-xs">{status}</SelectItem>))}</SelectContent>
                         </Select>
-                      </TableCell></TableRow>))}</TableBody>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {order.status === 'Out for Delivery' ? (
+                            activeWatchIdsRef.current[order.id!] ? (
+                                <Badge variant="default" className="bg-green-500 hover:bg-green-600">Enviando <MapPin className="ml-1 h-3 w-3"/></Badge>
+                            ) : (
+                                <Badge variant="outline">Inactivo</Badge>
+                            )
+                        ) : (
+                            <Badge variant="secondary">N/A</Badge>
+                        )}
+                      </TableCell>
+                      </TableRow>))}</TableBody>
                     </Table></div>)}
                 </CardContent>
-                <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión de estados de pedidos.</p></CardFooter>
+                <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión de estados de pedidos y seguimiento GPS.</p></CardFooter>
               </Card>
             </TabsContent>
 
@@ -422,21 +457,9 @@ export default function AdminPage() {
                   : allUsers.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Usuarios</AlertTitle><AlertDescription>No hay usuarios registrados.</AlertDescription></Alert>)
                   : (<div className="overflow-x-auto"><Table><TableCaption>Usuarios registrados en Firestore.</TableCaption><TableHeader><TableRow><TableHead>Email</TableHead><TableHead>Nombre</TableHead><TableHead className="text-center">Rol</TableHead></TableRow></TableHeader>
                       <TableBody>{allUsers.map((u) => (<TableRow key={u.uid}><TableCell className="font-medium">{u.email}</TableCell><TableCell>{u.displayName || 'N/A'}</TableCell><TableCell className="text-center">
-                        <Select 
-                          value={u.role || 'user'} 
-                          onValueChange={(newRole) => handleUpdateUserRole(u.uid, newRole as typeof userRoles[number])} 
-                          disabled={isAnyActionInProgress || u.uid === user?.uid}
-                        >
-                            <SelectTrigger className="w-[120px] h-9 text-xs mx-auto">
-                                <SelectValue placeholder="Cambiar rol">
-                                    {u.role === 'admin' ? <UserCog className="inline mr-1.5 h-3.5 w-3.5" /> : <UserCheck className="inline mr-1.5 h-3.5 w-3.5" />}
-                                    {u.role}
-                                </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>{userRoles.map(role => (<SelectItem key={role} value={role} className="text-xs">
-                                {role === 'admin' ? <UserCog className="inline mr-1.5 h-3.5 w-3.5" /> : <UserCheck className="inline mr-1.5 h-3.5 w-3.5" />}
-                                {role}
-                            </SelectItem>))}</SelectContent>
+                        <Select value={u.role || 'user'} onValueChange={(newRole) => handleUpdateUserRole(u.uid, newRole as typeof userRoles[number])} disabled={isAnyActionInProgress || u.uid === user?.uid}>
+                            <SelectTrigger className="w-[120px] h-9 text-xs mx-auto"><SelectValue placeholder="Cambiar rol">{u.role === 'admin' ? <UserCog className="inline mr-1.5 h-3.5 w-3.5" /> : <UserCheck className="inline mr-1.5 h-3.5 w-3.5" />}{u.role}</SelectValue></SelectTrigger>
+                            <SelectContent>{userRoles.map(role => (<SelectItem key={role} value={role} className="text-xs">{role === 'admin' ? <UserCog className="inline mr-1.5 h-3.5 w-3.5" /> : <UserCheck className="inline mr-1.5 h-3.5 w-3.5" />}{role}</SelectItem>))}</SelectContent>
                         </Select>
                         {u.uid === user?.uid && <p className="text-xs text-muted-foreground mt-1">(Tu cuenta)</p>}
                       </TableCell></TableRow>))}</TableBody>
@@ -450,22 +473,10 @@ export default function AdminPage() {
               <Card>
                 <CardHeader className="border-b">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                      <CardTitle className="text-2xl font-headline flex items-center gap-2"><ShoppingBasket />Gestión de Productos</CardTitle>
-                      <CardDescription>Añade, edita o elimina productos del menú.</CardDescription>
-                    </div>
+                    <div><CardTitle className="text-2xl font-headline flex items-center gap-2"><ShoppingBasket />Gestión de Productos</CardTitle><CardDescription>Añade, edita o elimina productos del menú.</CardDescription></div>
                     <div className="flex gap-2">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" disabled={isAnyActionInProgress}><UploadCloud />Importar Menú</Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader><AlertDialogTitle>¿Confirmar Importación?</AlertDialogTitle><AlertDialogDescription>Añadirá productos iniciales. No borrará existentes.</AlertDialogDescription></AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel disabled={isImporting}>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleImportInitialMenu} disabled={isImporting}>{isImporting && <Loader2 className="animate-spin"/>}Confirmar</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
+                      <AlertDialog><AlertDialogTrigger asChild><Button variant="outline" disabled={isAnyActionInProgress}><UploadCloud />Importar Menú</Button></AlertDialogTrigger>
+                        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Confirmar Importación?</AlertDialogTitle><AlertDialogDescription>Añadirá productos iniciales. No borrará existentes.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isImporting}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleImportInitialMenu} disabled={isImporting}>{isImporting && <Loader2 className="animate-spin"/>}Confirmar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
                       </AlertDialog>
                       <Button onClick={handleOpenAddModal} disabled={isAnyActionInProgress}><PackagePlus />Añadir Producto</Button>
                     </div>
@@ -482,11 +493,9 @@ export default function AdminPage() {
                 <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión CRUD de productos.</p></CardFooter>
               </Card>
             </TabsContent>
-
           </Tabs>
         </CardContent>
       </Card>
-
 
       <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => { setIsEditModalOpen(isOpen); if (!isOpen) { setEditingProduct(null); editForm.reset(); resetImageStates();}}}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="flex items-center gap-2"><Edit/>Editar Producto</DialogTitle><DialogDescription>Modifica "{editingProduct?.name}".</DialogDescription></DialogHeader>
@@ -508,4 +517,3 @@ export default function AdminPage() {
     </div>
   );
 }
-

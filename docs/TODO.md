@@ -37,11 +37,17 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
 - [x] **PWA (Progressive Web App) Básica:**
     - [x] Configuración con `next-pwa`.
     - [x] `manifest.json` creado.
-    - [ ] El usuario debe crear y añadir los iconos (`public/icons/`).
+    - [x] El usuario debe crear y añadir los iconos (`public/icons/`).
 - [ ] **Seguimiento de Pedidos en Tiempo Real (Avanzado):**
-    - [ ] Implementar notificaciones Push reales (ej. FCM) para cambios de estado de pedido.
-- [ ] **Internacionalización (i18n):**
-    - [ ] Soporte para múltiples idiomas (ej. Inglés y Español).
+    - [x] **Implementación Simplificada:** Seguimiento GPS desde el panel de admin (móvil del repartidor) a Firestore y visualización en mapa para el cliente (PWA, con limitaciones de segundo plano).
+    - [ ] Implementar notificaciones Push reales (ej. FCM) para cambios de estado de pedido y seguimiento.
+- [x] **Internacionalización (i18n) - Textos en Español:**
+    - [x] Traducir los textos de la interfaz de cliente (home, checkout, producto, carrito, etc.) al español.
+- [ ] **Optimización de Consultas a Firestore:**
+    - [ ] Revisar y optimizar índices de Firestore para consultas comunes (ej. pedidos por usuario, productos por categoría).
+- [ ] **Filtrado y Búsqueda de Productos:**
+    - [ ] Permitir a los usuarios filtrar productos por categoría en la página principal.
+    - [ ] Añadir una barra de búsqueda de productos.
 
 ## Mejoras de IA con Genkit
 - [ ] **Recomendaciones de Pizza Personalizadas:**
@@ -59,7 +65,7 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
     - [ ] Pruebas E2E (End-to-End) para simular la interacción del usuario.
 - [ ] **Optimización de Rendimiento:**
     *   [x] Revisión y optimización de la carga de imágenes (uso de `next/image` y `remotePatterns`).
-    *   [ ] Code splitting y lazy loading donde sea aplicable.
+    *   [ ] Code splitting y lazy loading donde sea aplicable (ya se usa `next/dynamic` para mapa).
     *   [ ] Monitorización del rendimiento (Lighthouse, Web Vitals).
 - [ ] **Mejoras de Accesibilidad (A11y):**
     *   [ ] Auditoría completa de accesibilidad.
@@ -67,11 +73,10 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
 - [ ] **Configuración de CI/CD:**
     *   [ ] Pipeline para compilación, pruebas y despliegue automáticos.
 - [ ] **Manejo de Errores Avanzado:**
-    *   [ ] Página 404 personalizada.
-    *   [ ] Mejora de los mensajes de error para el usuario.
+    *   [x] Página 404 personalizada (Next.js la provee por defecto, se puede customizar).
+    *   [x] Mejora de los mensajes de error para el usuario (a través de toasts y FormMessage).
 - [ ] **Sección de "Ofertas Especiales" o "Promociones".**
 - [ ] **Posibilidad de personalizar pizzas (ingredientes extra/quitados).**
-- [ ] **Notificaciones Push (opcional) para actualizaciones de pedidos.**
 
 ## Documentación
 - [x] Mantener actualizada la documentación de arquitectura.

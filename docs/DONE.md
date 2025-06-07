@@ -37,6 +37,8 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Componente de cabecera (Header) con logo y acceso al carrito.
     - [x] Componente de pie de página (Footer) básico.
     - [x] Reordenamiento de pestañas en perfil de cliente y panel de admin para mejor UX.
+    - [x] Estados de pedido con colores distintivos en perfil de cliente.
+    - [x] Textos de la interfaz de cliente mayormente en español.
 - **Estructura del Proyecto y Configuración:**
     - [x] Proyecto Next.js configurado con App Router.
     - [x] Uso de TypeScript.
@@ -60,7 +62,6 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Página de perfil (`/profile`) para ver información del usuario y de Firebase Auth.
     - [x] Visualización del historial de pedidos del usuario desde Firestore (con actualizaciones en tiempo real y toasts de notificación de cambio de estado).
     - [x] Edición de nombre, dirección de envío predeterminada.
-    - [x] Estados de pedido con colores distintivos.
     - [x] Ocultar UID de la vista del cliente.
 - **Panel de Administración (`/admin`):**
     - [x] Ruta `/admin` protegida por rol 'admin' (definido en perfil de usuario en Firestore).
@@ -80,5 +81,8 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Añadido `next-pwa` y configuración básica.
     - [x] Creado `manifest.json`.
     - [x] Enlaces y metadatos en `layout.tsx`. (Iconos deben ser creados manualmente por el usuario).
+- **Seguimiento de Pedidos Simplificado:**
+    - [x] El administrador puede iniciar/detener el envío de coordenadas GPS para un pedido marcado como "Out for Delivery".
+    - [x] El cliente puede ver la ubicación del repartidor en un mapa en su página de perfil si el pedido está "Out for Delivery".
 
 Esta lista se actualizará a medida que se completen más tareas del archivo `TODO.md`.
