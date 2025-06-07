@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useEffect, useState, useRef } from 'react'; // Added useRef
+import { useEffect, useState, useRef } from 'react'; // useRef is already imported
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, KeyRound, AlertTriangle, MailCheck, MailWarning, ListOrdered, UserCog } from 'lucide-react'; 
+import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, KeyRound, AlertTriangle, MailCheck, MailWarning, ListOrdered, UserCog, Loader2 } from 'lucide-react'; 
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore'; // Added onSnapshot
+import { collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
 import type { Order, UpdateUserProfileFormValues, ShippingAddressDetails } from '@/lib/types'; 
 import Image from 'next/image';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -82,7 +82,9 @@ export default function ProfilePage() {
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [isEditProfileDialogOpen, setIsEditProfileDialogOpen] = useState(false);
-  const initialDataLoadedRef = useRef(false); // Used to track initial data load for orders
+  
+  const initialDataLoadedRef = useRef(false);
+  const prevOrdersRef = useRef<Order[]>([]); // Ref to store previous orders
 
   const hasPasswordProvider = user?.providerData?.some(p => p.providerId === 'password');
 
@@ -124,17 +126,24 @@ export default function ProfilePage() {
     }
   }, [userProfile, user, editProfileForm, isEditProfileDialogOpen]);
 
+  // Update prevOrdersRef after orders state changes
+  useEffect(() => {
+    prevOrdersRef.current = orders;
+  }, [orders]);
 
   useEffect(() => {
     if (!user?.uid) {
       setOrders([]);
       setIsLoadingOrders(false);
-      initialDataLoadedRef.current = false; // Reset when user logs out
+      initialDataLoadedRef.current = false; 
+      prevOrdersRef.current = []; // Reset prevOrdersRef as well
       return;
     }
 
     setIsLoadingOrders(true);
-    // initialDataLoadedRef.current is false here, will be set to true after first snapshot
+    // Reset initialDataLoadedRef for new user subscriptions
+    // It's important this is false before the first snapshot for a new user
+    initialDataLoadedRef.current = false; 
     
     const ordersQuery = query(
       collection(db, "orders"),
@@ -144,13 +153,14 @@ export default function ProfilePage() {
 
     const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
       const fetchedOrders: Order[] = snapshot.docs.map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as Order));
+      
+      // Use the snapshot of prevOrdersRef from *before* this update
+      const currentPrevOrders = prevOrdersRef.current;
 
       if (initialDataLoadedRef.current) {
-        // Only compare and notify after the initial data load
         fetchedOrders.forEach(newOrder => {
-          const oldOrder = orders.find(o => o.id === newOrder.id);
+          const oldOrder = currentPrevOrders.find(o => o.id === newOrder.id);
           if (oldOrder && oldOrder.status !== newOrder.status) {
-            // Check if updatedAt exists and is more recent, or if status simply changed
             const newOrderUpdatedAtMs = newOrder.updatedAt?.toMillis ? newOrder.updatedAt.toMillis() : 0;
             const oldOrderUpdatedAtMs = oldOrder.updatedAt?.toMillis ? oldOrder.updatedAt.toMillis() : 0;
 
@@ -164,11 +174,10 @@ export default function ProfilePage() {
           }
         });
       } else {
-        // This is the first data snapshot
         initialDataLoadedRef.current = true;
       }
 
-      setOrders(fetchedOrders);
+      setOrders(fetchedOrders); // This will trigger the useEffect that updates prevOrdersRef.current
       setIsLoadingOrders(false);
     }, (error) => {
       console.error("Error fetching orders with onSnapshot: ", error);
@@ -180,12 +189,12 @@ export default function ProfilePage() {
       setIsLoadingOrders(false);
     });
 
-    // Cleanup subscription on unmount or if user.uid changes
     return () => {
       unsubscribe();
-      initialDataLoadedRef.current = false; // Reset for next user or remount
+      initialDataLoadedRef.current = false; 
+      prevOrdersRef.current = []; // Clean up on unmount or user change
     };
-  }, [user?.uid, toast, orders]); // `orders` is included for comparison logic with the current state
+  }, [user?.uid, toast]); // Removed 'orders' from dependencies
 
 
   async function onSubmitPasswordChange(data: ChangePasswordFormValues) {
@@ -219,7 +228,8 @@ export default function ProfilePage() {
 
   if (authIsLoading || isLoadingUserProfile || !user || !userProfile) { 
     return (
-      <div className="flex justify-center items-center min-h-[calc(100vh-20rem)]">
+      <div className="flex flex-col justify-center items-center min-h-[calc(100vh-20rem)]">
+        <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
         <p className="text-lg text-muted-foreground">Cargando perfil...</p>
       </div>
     );
@@ -410,7 +420,10 @@ export default function ProfilePage() {
                   <ShoppingBag /> Mis Pedidos
                 </h2>
                 {isLoadingOrders ? (
-                  <div className="text-center py-10"><p className="text-lg text-muted-foreground">Cargando tus pedidos...</p></div>
+                   <div className="flex flex-col justify-center items-center text-center py-10">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+                    <p className="text-lg text-muted-foreground">Cargando tus pedidos...</p>
+                   </div>
                 ) : orders.length === 0 ? (
                   <div className="text-center py-10">
                     <Package className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
