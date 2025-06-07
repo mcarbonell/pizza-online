@@ -28,14 +28,14 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
     - [ ] Añadir opción de inicio de sesión con Facebook (opcional).
 - [x] **Manejo de Contraseñas Avanzado (Firebase Auth):**
     - [x] Implementar funcionalidad de "Olvidé mi contraseña" (restablecimiento de contraseña por correo).
-    - [ ] Opción de cambiar contraseña desde el perfil del usuario.
+    - [x] Opción de cambiar contraseña desde el perfil del usuario.
 - [ ] **Verificación de Correo Electrónico (Firebase Auth):**
     - [ ] Enviar correo de verificación al registrarse.
     - [ ] Mostrar estado de verificación en el perfil y restringir ciertas acciones si no está verificado.
 - [x] **Historial de Pedidos:**
     - [x] Guardar pedidos en Firestore al completar el checkout.
     - [x] Página para que los usuarios vean sus pedidos anteriores (requiere backend o Firestore).
-    - [ ] Detalles de cada pedido.
+    - [x] Detalles de cada pedido.
 - [ ] **Panel de Administración:**
     - [ ] CRUD para productos (Pizzas, Acompañamientos, Bebidas, Postres) - podría usar Firestore.
     - [ ] Gestión de categorías de productos.

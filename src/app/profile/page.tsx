@@ -6,19 +6,49 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, CreditCardIcon } from 'lucide-react';
+import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, CreditCardIcon, KeyRound } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import type { Order } from '@/lib/types'; 
 import Image from 'next/image';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useToast } from "@/hooks/use-toast";
+
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "La contraseña actual es requerida."),
+  newPassword: z.string().min(6, "La nueva contraseña debe tener al menos 6 caracteres."),
+  confirmNewPassword: z.string().min(6, "Confirma tu nueva contraseña."),
+}).refine(data => data.newPassword === data.confirmNewPassword, {
+  message: "Las nuevas contraseñas no coinciden.",
+  path: ["confirmNewPassword"], 
+});
+
+type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 export default function ProfilePage() {
-  const { user, userProfile, logout, isLoading: authIsLoading, isLoadingUserProfile } = useAuth(); 
+  const { user, userProfile, logout, updateUserPassword, isLoading: authIsLoading, isLoadingUserProfile } = useAuth(); 
   const router = useRouter();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+
+  const passwordForm = useForm<ChangePasswordFormValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmNewPassword: "",
+    },
+  });
 
   useEffect(() => {
     if (!authIsLoading && !user) {
@@ -48,6 +78,17 @@ export default function ProfilePage() {
       fetchOrders();
     }
   }, [user?.uid]);
+
+  async function onSubmitPasswordChange(data: ChangePasswordFormValues) {
+    try {
+      await updateUserPassword(data.currentPassword, data.newPassword);
+      passwordForm.reset();
+      setIsPasswordDialogOpen(false); 
+    } catch (error) {
+      // Error toast is handled in AuthContext, form remains open
+      console.error("Failed to change password from profile page", error)
+    }
+  }
 
   if (authIsLoading || isLoadingUserProfile || !user) { 
     return (
@@ -100,7 +141,7 @@ export default function ProfilePage() {
                 </div>
             )}
              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                <UserCircle className="h-5 w-5 text-primary" /> {/* Consider changing icon if UID is not user-facing */}
+                <UserCircle className="h-5 w-5 text-primary" /> 
                 <div>
                     <p className="text-sm font-medium text-muted-foreground">User ID (UID)</p>
                     <p className="text-md font-semibold break-all">{user.uid}</p>
@@ -137,9 +178,74 @@ export default function ProfilePage() {
             <Button variant="outline" disabled>
               <Edit3 /> Editar Perfil, Dirección y Pago (Próximamente)
             </Button>
-            <Button variant="outline" disabled>
-              <ShieldCheck /> Cambiar Contraseña (Próximamente)
-            </Button>
+            
+            <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <ShieldCheck /> Cambiar Contraseña
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2"><KeyRound/> Cambiar Contraseña</DialogTitle>
+                  <DialogDescription>
+                    Introduce tu contraseña actual y la nueva contraseña.
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...passwordForm}>
+                  <form onSubmit={passwordForm.handleSubmit(onSubmitPasswordChange)} className="space-y-4 py-4">
+                    <FormField
+                      control={passwordForm.control}
+                      name="currentPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Contraseña Actual</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••••" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={passwordForm.control}
+                      name="newPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nueva Contraseña</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••••" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={passwordForm.control}
+                      name="confirmNewPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirmar Nueva Contraseña</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••••" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button type="button" variant="ghost">Cancelar</Button>
+                      </DialogClose>
+                      <Button type="submit" disabled={passwordForm.formState.isSubmitting || authIsLoading}>
+                        {passwordForm.formState.isSubmitting || authIsLoading ? 'Actualizando...' : 'Actualizar Contraseña'}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+
           </div>
 
           <Button onClick={handleLogout} variant="destructive" className="w-full mt-6" disabled={authIsLoading}>
@@ -241,3 +347,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

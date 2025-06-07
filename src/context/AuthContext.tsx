@@ -10,25 +10,29 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut,
-  updateProfile as updateFirebaseProfile, // Renamed to avoid conflict
+  updateProfile as updateFirebaseProfile, 
   signInWithPopup, 
   sendPasswordResetEmail,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  updatePassword as firebaseUpdatePassword,
   type User as FirebaseUser
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'; // Import Firestore functions
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'; 
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   user: User | null;
-  userProfile: UserProfile | null; // Add userProfile state
-  isLoadingUserProfile: boolean; // Add loading state for profile
+  userProfile: UserProfile | null; 
+  isLoadingUserProfile: boolean; 
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  updateUserPassword: (currentPassword: string, newPassword: string) => Promise<void>;
   isLoading: boolean;
-  fetchUserProfile: (uid: string) => Promise<void>; // Function to fetch/refresh profile
+  fetchUserProfile: (uid: string) => Promise<void>; 
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,7 +49,6 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-// Helper function to create or update user profile in Firestore
 const createUserProfileDocument = async (firebaseUser: FirebaseUser) => {
   if (!firebaseUser) return;
 
@@ -53,7 +56,6 @@ const createUserProfileDocument = async (firebaseUser: FirebaseUser) => {
   const userSnap = await getDoc(userRef);
 
   if (!userSnap.exists()) {
-    // Create new user profile document
     const { uid, email, displayName } = firebaseUser;
     const createdAt = serverTimestamp();
     try {
@@ -63,14 +65,14 @@ const createUserProfileDocument = async (firebaseUser: FirebaseUser) => {
         displayName: displayName || '',
         createdAt,
         updatedAt: createdAt,
-        defaultShippingAddress: null, // Initialize with no default address
+        defaultShippingAddress: null,
+        defaultPaymentMethod: null,
       });
       console.log("User profile document created for new user:", uid);
     } catch (error) {
       console.error("Error creating user profile document:", error);
     }
   } else {
-    // Optionally, update existing document if needed (e.g., displayName changed via Google)
     const existingData = userSnap.data() as UserProfile;
     if (existingData.displayName !== firebaseUser.displayName || existingData.email !== firebaseUser.email) {
       try {
@@ -105,8 +107,6 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       if (docSnap.exists()) {
         setUserProfile(docSnap.data() as UserProfile);
       } else {
-        // This case might happen if the document wasn't created for some reason
-        // or if we want to create it on-demand if missing after login
         console.log("No user profile found in Firestore for UID:", uid);
         setUserProfile(null); 
       }
@@ -129,8 +129,8 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
           displayName: firebaseUser.displayName,
         };
         setUser(simpleUser);
-        await createUserProfileDocument(firebaseUser); // Ensure profile exists
-        await fetchUserProfile(firebaseUser.uid); // Fetch the profile data
+        await createUserProfileDocument(firebaseUser); 
+        await fetchUserProfile(firebaseUser.uid); 
       } else {
         setUser(null);
         setUserProfile(null);
@@ -145,7 +145,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
-        await fetchUserProfile(userCredential.user.uid); // Fetch profile on login
+        await fetchUserProfile(userCredential.user.uid); 
       }
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
@@ -168,12 +168,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         if (name) {
           await updateFirebaseProfile(userCredential.user, { displayName: name });
         }
-        // createUserProfileDocument is called by onAuthStateChanged,
-        // but we can call it here too to ensure it's done before redirect if needed,
-        // or rely on the onAuthStateChanged listener.
-        // For this flow, onAuthStateChanged should handle it.
       }
-      // User and profile will be set by onAuthStateChanged
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Registro exitoso", description: "¡Bienvenido a PizzaPlace!" });
@@ -191,14 +186,12 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     setIsLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      // createUserProfileDocument and fetchUserProfile will be handled by onAuthStateChanged
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Inicio de sesión con Google exitoso", description: `¡Bienvenido, ${result.user.displayName || result.user.email}!` });
     } catch (error: any) {
       console.error("Error during Google login:", error);
       let errorMessage = "No se pudo iniciar sesión con Google.";
-      // ... (error handling as before)
       if (error.code === 'auth/popup-closed-by-user') {
         errorMessage = "El proceso de inicio de sesión con Google fue cancelado.";
         toast({ title: "Proceso cancelado", description: errorMessage, variant: "default" });
@@ -237,20 +230,35 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     }
   };
 
-  const logout = async () => {
+  const updateUserPassword = async (currentPassword: string, newPassword: string) => {
     setIsLoading(true);
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser || !firebaseUser.email) {
+      toast({ title: "Error", description: "Usuario no encontrado o sin email.", variant: "destructive" });
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      await signOut(auth);
-      // User and profile will be set to null by onAuthStateChanged
-      router.push('/login');
-      toast({ title: "Sesión cerrada", description: "Has cerrado sesión correctamente." });
+      const credential = EmailAuthProvider.credential(firebaseUser.email, currentPassword);
+      await reauthenticateWithCredential(firebaseUser, credential);
+      await firebaseUpdatePassword(firebaseUser, newPassword);
+      toast({ title: "Contraseña actualizada", description: "Tu contraseña ha sido cambiada exitosamente." });
     } catch (error: any) {
-      console.error("Error during logout:", error);
-      toast({ title: "Error al cerrar sesión", description: error.message, variant: "destructive" });
+      console.error("Error updating password:", error);
+      let errorMessage = "No se pudo actualizar la contraseña.";
+      if (error.code === 'auth/wrong-password') {
+        errorMessage = "La contraseña actual es incorrecta.";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "La nueva contraseña es demasiado débil.";
+      }
+      toast({ title: "Error al actualizar contraseña", description: errorMessage, variant: "destructive" });
+      throw error; // Re-throw para que el formulario pueda manejar el estado de envío
     } finally {
       setIsLoading(false);
     }
   };
+
 
   return (
     <AuthContext.Provider
@@ -263,6 +271,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         logout,
         loginWithGoogle,
         resetPassword,
+        updateUserPassword,
         isLoading,
         fetchUserProfile,
       }}
@@ -279,4 +288,3 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     </React.Suspense>
   );
 };
-
