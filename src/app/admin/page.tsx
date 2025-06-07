@@ -47,6 +47,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -71,9 +72,6 @@ const productFormSchema = z.object({
   category: z.enum(productCategories, {
     errorMap: () => ({ message: "Por favor selecciona una categoría válida." }),
   }),
-  // imageUrl is not directly in the form for user input for add/edit with upload,
-  // but the schema is used for the data that gets saved to Firestore.
-  // It's populated by the upload logic.
   imageUrl: z.string().url({ message: "Se requiere una URL de imagen válida." }).optional().or(z.literal('')),
   dataAiHint: z.string().max(30, "La pista de IA no debe exceder los 30 caracteres.").optional(),
 });
@@ -118,7 +116,7 @@ export default function AdminPage() {
       description: "",
       price: 0,
       category: "Pizzas",
-      imageUrl: DEFAULT_PLACEHOLDER_IMAGE, // Default for new products if no image uploaded
+      imageUrl: DEFAULT_PLACEHOLDER_IMAGE, 
       dataAiHint: "",
     },
   });
@@ -173,12 +171,11 @@ export default function AdminPage() {
         imageUrl: editingProduct.imageUrl,
         dataAiHint: editingProduct.dataAiHint || "",
       });
-      // Ensure image preview reflects the current product's image when modal opens
       setImagePreview(editingProduct.imageUrl || null);
-      setImageFile(null); // Reset file selection
+      setImageFile(null); 
       setUploadProgress(null);
     } else {
-       editForm.reset(editForm.formState.defaultValues); // Reset to defaults if no product
+       editForm.reset(editForm.formState.defaultValues); 
     }
   }, [editingProduct, editForm]);
 
@@ -227,11 +224,17 @@ export default function AdminPage() {
   const handleOpenEditModal = (product: Product) => {
     setEditingProduct(product);
     setIsEditModalOpen(true);
-    // Preview is set by useEffect on editingProduct change
   };
   
   const handleOpenAddModal = () => {
-    addForm.reset();
+    addForm.reset({
+        name: "",
+        description: "",
+        price: 0,
+        category: "Pizzas",
+        imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
+        dataAiHint: "",
+    });
     resetImageStates();
     setIsAddModalOpen(true);
   };
@@ -242,7 +245,7 @@ export default function AdminPage() {
     setIsUploading(true);
     setUploadProgress(0);
 
-    let finalImageUrl = editingProduct.imageUrl; // Use existing imageUrl by default
+    let finalImageUrl = editingProduct.imageUrl; 
 
     try {
       if (imageFile) {
@@ -270,7 +273,7 @@ export default function AdminPage() {
 
       const productDataToUpdate = {
         ...formData,
-        price: Number(formData.price), // Ensure price is number
+        price: Number(formData.price), 
         imageUrl: finalImageUrl,
       };
       
@@ -304,17 +307,16 @@ export default function AdminPage() {
     setUploadProgress(0);
     
     try {
-      // Step 1: Add product data to Firestore to get an ID
       const productDataForFirestore = {
         ...formData,
-        price: Number(formData.price), // Ensure price is number
-        imageUrl: '', // Temporary, will be updated after image upload
+        price: Number(formData.price), 
+        imageUrl: '', 
         createdAt: serverTimestamp(),
       };
       
       const docRef = await addDoc(collection(db, 'products'), productDataForFirestore);
       const newProductId = docRef.id;
-      let finalImageUrl = DEFAULT_PLACEHOLDER_IMAGE; // Default placeholder
+      let finalImageUrl = DEFAULT_PLACEHOLDER_IMAGE;
 
       if (imageFile) {
         const imageStoragePath = `products/${newProductId}/${imageFile.name}`;
@@ -334,11 +336,8 @@ export default function AdminPage() {
             }
           );
         });
-        // Step 2: Update the product document with the actual image URL
         await updateDoc(docRef, { imageUrl: finalImageUrl });
       } else {
-        // If no image file, still update with the default placeholder if necessary
-        // (though it might be set initially, this ensures it if logic changes)
          await updateDoc(docRef, { imageUrl: finalImageUrl });
       }
       
@@ -475,8 +474,6 @@ export default function AdminPage() {
                 <p className="text-xs text-muted-foreground text-center">{Math.round(uploadProgress)}% subido</p>
             </div>
           )}
-          {/* Use form errors for imageUrl if any (though it's mostly handled by upload logic) */}
-          {/* <FormMessage>{currentForm.formState.errors.imageUrl?.message}</FormMessage> */}
         </div>
       </FormItem>
 
@@ -626,7 +623,7 @@ export default function AdminPage() {
       <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => {
         setIsEditModalOpen(isOpen);
         if (!isOpen) {
-          setEditingProduct(null); // Clear editing product when dialog closes
+          setEditingProduct(null); 
           editForm.reset();
           resetImageStates();
         }
@@ -690,4 +687,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
