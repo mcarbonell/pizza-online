@@ -9,18 +9,43 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function CheckoutPage() {
+  const { user, isLoading: authIsLoading } = useAuth();
   const { cartItems, getCartTotal, getTotalItems } = useCart();
+  const router = useRouter();
+  
   const total = getCartTotal();
   const totalItems = getTotalItems();
 
+  useEffect(() => {
+    if (!authIsLoading && !user) {
+      router.push('/login?redirect=/checkout');
+    }
+  }, [user, authIsLoading, router]);
+
+  if (authIsLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <p className="text-lg text-muted-foreground">Cargando...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    // User will be redirected by useEffect, this is a fallback or if redirect is slow
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <p className="text-lg text-muted-foreground">Redirigiendo a inicio de sesión...</p>
+      </div>
+    );
+  }
+  
+  // This check must come AFTER auth check
   if (totalItems === 0 && typeof window !== 'undefined') {
-     // This check ensures it only runs on the client after mount
-     // If cart is empty, redirect to home. Can't use useRouter hook at top level of Server Component.
-     // For a client component page, this would be fine.
-     // For simplicity in this structure, we'll show a message if cart is empty.
-     // A useEffect with router.push('/') would be typical in a fully client-rendered scenario.
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <h1 className="text-3xl font-headline mb-4">Your Cart is Empty</h1>

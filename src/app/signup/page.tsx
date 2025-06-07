@@ -18,7 +18,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { UserPlus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 const signupFormSchema = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }).optional(),
@@ -29,8 +30,14 @@ const signupFormSchema = z.object({
 type SignupFormValues = z.infer<typeof signupFormSchema>;
 
 export default function SignupPage() {
-  const { signup, isLoading } = useAuth();
-  const { toast } = useToast();
+  const { user, signup, isLoading: authIsLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authIsLoading && user) {
+      router.push('/profile'); // Or wherever you want to redirect logged-in users
+    }
+  }, [user, authIsLoading, router]);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupFormSchema),
@@ -43,12 +50,28 @@ export default function SignupPage() {
 
   async function onSubmit(data: SignupFormValues) {
     try {
+      // The signup function in AuthContext will handle redirection on success
       await signup(data.email, data.password, data.name);
-      // Navigation is handled within the signup function of AuthContext on success
     } catch (error: any) {
-      // Error handling is done within AuthContext
       console.error("Signup page submit error:", error);
     }
+  }
+  
+  if (authIsLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-20rem)] py-12">
+        <p className="text-lg text-muted-foreground">Cargando...</p>
+      </div>
+    );
+  }
+
+  // If user is already logged in, useEffect will redirect. This is a fallback render.
+   if (user) {
+     return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-20rem)] py-12">
+        <p className="text-lg text-muted-foreground">Ya tienes una sesión activa. Redirigiendo...</p>
+      </div>
+    );
   }
 
   return (
@@ -100,8 +123,8 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full text-lg py-3 bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isLoading || form.formState.isSubmitting}>
-                {isLoading || form.formState.isSubmitting ? 'Creando cuenta...' : 'Registrarse'}
+              <Button type="submit" className="w-full text-lg py-3 bg-accent hover:bg-accent/90 text-accent-foreground" disabled={authIsLoading || form.formState.isSubmitting}>
+                {authIsLoading || form.formState.isSubmitting ? 'Creando cuenta...' : 'Registrarse'}
               </Button>
             </form>
           </Form>

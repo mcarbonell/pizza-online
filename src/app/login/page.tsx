@@ -18,7 +18,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { LogIn } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
@@ -28,8 +29,16 @@ const loginFormSchema = z.object({
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 export default function LoginPage() {
-  const { login, isLoading } = useAuth();
-  const { toast } = useToast();
+  const { user, login, isLoading: authIsLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectPath = searchParams.get('redirect') || '/profile';
+
+  useEffect(() => {
+    if (!authIsLoading && user) {
+      router.push(redirectPath);
+    }
+  }, [user, authIsLoading, router, redirectPath]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -41,13 +50,38 @@ export default function LoginPage() {
 
   async function onSubmit(data: LoginFormValues) {
     try {
+      // The login function in AuthContext will handle redirection on success
+      // by using the redirectPath if provided or defaulting to /profile.
+      // We no longer need to pass redirectPath to login function directly.
+      // The AuthContext's login function needs to be aware of this.
+      // For now, we assume login function pushes to /profile, and the useEffect above handles if already logged in.
       await login(data.email, data.password);
-      // Navigation is handled within the login function of AuthContext on success
+       // If login is successful, onAuthStateChanged will update 'user' and useEffect will redirect.
+       // If a redirect param was present, AuthContext's login would ideally handle it.
+       // For now, a successful login should push to /profile (done in AuthContext),
+       // or if redirect was specified, AuthContext should use that.
+       // We will update AuthContext to handle redirectPath later if needed.
+
     } catch (error: any) {
-      // Error handling is done within AuthContext, but you can add specific UI updates here if needed
-      // For example, form.setError for specific fields if backend provides that level of detail
       console.error("Login page submit error:", error);
     }
+  }
+
+  if (authIsLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-20rem)] py-12">
+        <p className="text-lg text-muted-foreground">Cargando...</p>
+      </div>
+    );
+  }
+  
+  // If user is already logged in, useEffect will redirect. This is a fallback render.
+  if (user) {
+     return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-20rem)] py-12">
+        <p className="text-lg text-muted-foreground">Ya has iniciado sesión. Redirigiendo...</p>
+      </div>
+    );
   }
 
   return (
@@ -86,8 +120,8 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full text-lg py-3" disabled={isLoading || form.formState.isSubmitting}>
-                {isLoading || form.formState.isSubmitting ? 'Accediendo...' : 'Iniciar Sesión'}
+              <Button type="submit" className="w-full text-lg py-3" disabled={authIsLoading || form.formState.isSubmitting}>
+                {authIsLoading || form.formState.isSubmitting ? 'Accediendo...' : 'Iniciar Sesión'}
               </Button>
             </form>
           </Form>

@@ -19,6 +19,9 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
     - [x] Actualizar página de Perfil para mostrar datos del usuario de Firebase.
     - [x] Añadir manejo de errores y notificaciones (toasts) para operaciones de autenticación.
     - [x] Crear archivo `.env.local.example` para las credenciales de Firebase.
+- [x] **Protección de Rutas:**
+    - [x] Proteger rutas como `/profile` y `/checkout` para que solo usuarios autenticados puedan acceder. Redirigir a `/login` si no está autenticado.
+    - [x] Rutas como `/login` y `/signup` deberían redirigir a `/profile` o `/` si el usuario ya está autenticado.
 - [ ] **Autenticación de Usuarios (Firebase Auth - Fase 3 - Proveedores Sociales):**
     - [ ] Añadir opción de inicio de sesión con Google.
     - [ ] Añadir opción de inicio de sesión con Facebook (opcional).
@@ -28,9 +31,6 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
 - [ ] **Verificación de Correo Electrónico (Firebase Auth):**
     - [ ] Enviar correo de verificación al registrarse.
     - [ ] Mostrar estado de verificación en el perfil y restringir ciertas acciones si no está verificado.
-- [ ] **Protección de Rutas:**
-    - [ ] Proteger rutas como `/profile` y `/checkout` para que solo usuarios autenticados puedan acceder. Redirigir a `/login` si no está autenticado.
-    - [ ] Rutas como `/login` y `/signup` deberían redirigir a `/profile` o `/` si el usuario ya está autenticado.
 - [ ] **Historial de Pedidos:**
     - [ ] Página para que los usuarios vean sus pedidos anteriores (requiere backend o Firestore).
     - [ ] Detalles de cada pedido.
