@@ -8,8 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus } from 'lucide-react';
 import { db, storage } from '@/lib/firebase';
-import { collection, getDocs, query, orderBy, writeBatch, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { collection, getDocs, query, orderBy, writeBatch, doc, updateDoc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import type { Product } from '@/lib/types';
 import { initialProductData } from '@/data/products';
 import { useToast } from '@/hooks/use-toast';
@@ -38,7 +38,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialogTrigger, // Keep if direct trigger is needed, otherwise not used here
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -91,6 +91,10 @@ export default function AdminPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -249,6 +253,16 @@ export default function AdminPage() {
 
     try {
       if (imageFile) {
+        // Delete old image from storage if it's a Firebase Storage URL and not a placeholder
+        if (editingProduct.imageUrl && editingProduct.imageUrl.includes("firebasestorage.googleapis.com") && editingProduct.imageUrl !== DEFAULT_PLACEHOLDER_IMAGE) {
+          try {
+            const oldImageRef = storageRef(storage, editingProduct.imageUrl);
+            await deleteObject(oldImageRef);
+          } catch (error) {
+            console.warn("Could not delete old image or it didn't exist:", error);
+          }
+        }
+
         const imageStoragePath = `products/${editingProduct.id}/${imageFile.name}`;
         const imageStorageRefInstance = storageRef(storage, imageStoragePath);
         const uploadTask = uploadBytesResumable(imageStorageRefInstance, imageFile);
@@ -338,7 +352,7 @@ export default function AdminPage() {
         });
         await updateDoc(docRef, { imageUrl: finalImageUrl });
       } else {
-         await updateDoc(docRef, { imageUrl: finalImageUrl });
+         await updateDoc(docRef, { imageUrl: finalImageUrl }); // Save placeholder if no image uploaded
       }
       
       toast({
@@ -360,6 +374,57 @@ export default function AdminPage() {
     } finally {
       setIsUploading(false);
       setUploadProgress(null);
+    }
+  };
+
+  const handleOpenDeleteAlert = (product: Product) => {
+    setProductToDelete(product);
+    setIsDeleteAlertOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!productToDelete) return;
+
+    setIsDeletingProduct(true);
+    try {
+      // Delete image from Firebase Storage if it's a Firebase URL and not the default placeholder
+      if (productToDelete.imageUrl && productToDelete.imageUrl.includes("firebasestorage.googleapis.com") && productToDelete.imageUrl !== DEFAULT_PLACEHOLDER_IMAGE) {
+        try {
+          const imageRef = storageRef(storage, productToDelete.imageUrl);
+          await deleteObject(imageRef);
+        } catch (storageError: any) {
+          // Log error but continue if image deletion fails (e.g., file not found)
+          console.warn(`Could not delete image ${productToDelete.imageUrl} from Storage:`, storageError);
+           if (storageError.code !== 'storage/object-not-found') {
+            toast({
+                title: "Advertencia de eliminación de imagen",
+                description: `No se pudo eliminar la imagen del almacenamiento, pero el producto se eliminará de la base de datos. Error: ${storageError.message}`,
+                variant: "default", // Use default variant for warnings that are not critical
+                duration: 7000,
+            });
+           }
+        }
+      }
+
+      // Delete product document from Firestore
+      await deleteDoc(doc(db, 'products', productToDelete.id));
+
+      toast({
+        title: "Producto Eliminado",
+        description: `El producto "${productToDelete.name}" ha sido eliminado.`,
+      });
+      fetchProducts(); // Refresh product list
+    } catch (error: any) {
+      console.error("Error deleting product:", error);
+      toast({
+        title: "Error al Eliminar",
+        description: `No se pudo eliminar el producto "${productToDelete.name}". Revisa la consola.`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingProduct(false);
+      setIsDeleteAlertOpen(false);
+      setProductToDelete(null);
     }
   };
 
@@ -506,7 +571,7 @@ export default function AdminPage() {
             <div className="flex gap-2">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="outline" disabled={isImporting || isUploading}>
+                  <Button variant="outline" disabled={isImporting || isUploading || isDeletingProduct}>
                     {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
                     Importar Menú Inicial
                   </Button>
@@ -529,7 +594,7 @@ export default function AdminPage() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-              <Button onClick={handleOpenAddModal} disabled={isImporting || isUploading}>
+              <Button onClick={handleOpenAddModal} disabled={isImporting || isUploading || isDeletingProduct}>
                 <PackagePlus className="mr-2 h-4 w-4" /> Añadir Producto
               </Button>
             </div>
@@ -595,11 +660,11 @@ export default function AdminPage() {
                       <TableCell className="text-right">€{product.price.toFixed(2)}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex justify-center gap-1 sm:gap-2">
-                          <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => handleOpenEditModal(product)} disabled={isUploading}>
+                          <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => handleOpenEditModal(product)} disabled={isUploading || isDeletingProduct}>
                             <Edit className="h-4 w-4" />
                              <span className="sr-only">Editar</span>
                           </Button>
-                          <Button variant="destructive" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" disabled>
+                          <Button variant="destructive" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => handleOpenDeleteAlert(product)} disabled={isUploading || isDeletingProduct}>
                             <Trash2 className="h-4 w-4" />
                              <span className="sr-only">Eliminar</span>
                           </Button>
@@ -614,7 +679,7 @@ export default function AdminPage() {
         </CardContent>
         <CardFooter className="border-t pt-4">
             <p className="text-xs text-muted-foreground">
-                Funcionalidad de eliminar productos se añadirá próximamente.
+                Gestión completa de productos (CRUD).
             </p>
         </CardFooter>
       </Card>
@@ -640,9 +705,9 @@ export default function AdminPage() {
               {renderProductFormFields(editForm, imagePreview || editingProduct?.imageUrl || null)}
               <DialogFooter className="mt-6">
                 <DialogClose asChild>
-                  <Button type="button" variant="ghost" disabled={isUploading}>Cancelar</Button>
+                  <Button type="button" variant="ghost" disabled={isUploading || isDeletingProduct}>Cancelar</Button>
                 </DialogClose>
-                <Button type="submit" disabled={isUploading || editForm.formState.isSubmitting}>
+                <Button type="submit" disabled={isUploading || editForm.formState.isSubmitting || isDeletingProduct}>
                   {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   {isUploading ? 'Subiendo...' : 'Guardar Cambios'}
                 </Button>
@@ -672,9 +737,9 @@ export default function AdminPage() {
               {renderProductFormFields(addForm, imagePreview)}
               <DialogFooter className="mt-6">
                 <DialogClose asChild>
-                  <Button type="button" variant="ghost" disabled={isUploading}>Cancelar</Button>
+                  <Button type="button" variant="ghost" disabled={isUploading || isDeletingProduct}>Cancelar</Button>
                 </DialogClose>
-                <Button type="submit" disabled={isUploading || addForm.formState.isSubmitting}>
+                <Button type="submit" disabled={isUploading || addForm.formState.isSubmitting || isDeletingProduct}>
                   {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   {isUploading ? 'Subiendo...' : 'Añadir Producto'}
                 </Button>
@@ -684,6 +749,32 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Product Alert Dialog */}
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro de que quieres eliminar este producto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Esto eliminará permanentemente el producto "{productToDelete?.name}" de la base de datos y su imagen asociada del almacenamiento (si existe).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setProductToDelete(null)} disabled={isDeletingProduct}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete} 
+              disabled={isDeletingProduct}
+              className={buttonVariants({ variant: "destructive" })}
+            >
+              {isDeletingProduct ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isDeletingProduct ? 'Eliminando...' : 'Eliminar Producto'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
+
+
+    
