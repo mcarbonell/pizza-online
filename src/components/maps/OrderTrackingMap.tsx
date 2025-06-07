@@ -3,7 +3,7 @@
 
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L, { type LatLngExpression, type Map as LeafletMap } from 'leaflet';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 const defaultIcon = L.icon({
   iconUrl: '/leaflet/marker-icon.png',
@@ -21,7 +21,6 @@ interface OrderTrackingMapProps {
   orderId?: string;
 }
 
-// Component to update map view when position changes
 function ChangeView({ center, zoom }: { center: LatLngExpression; zoom: number }) {
   const map = useMap();
   useEffect(() => {
@@ -32,32 +31,36 @@ function ChangeView({ center, zoom }: { center: LatLngExpression; zoom: number }
   return null;
 }
 
-
 export default function OrderTrackingMap({ latitude, longitude, orderId }: OrderTrackingMapProps) {
-  const mapRef = useRef<LeafletMap | null>(null);
+  const [isClient, setIsClient] = useState(false);
+  const mapInstanceRef = useRef<LeafletMap | null>(null);
 
-  if (typeof window === 'undefined') {
+  useEffect(() => {
+    setIsClient(true); // Ensures MapContainer renders only on client
+  }, []);
+
+  // Cleanup effect: runs when component unmounts or orderId changes
+  useEffect(() => {
+    // This function will be called when the component is unmounted
+    // or when orderId changes (meaning the previous map instance needs cleanup)
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null; // Clear the ref
+        console.log(`Leaflet map instance for order ${orderId || ''} EXPLICITLY REMOVED.`);
+      }
+    };
+  }, [orderId]); // Key dependency: ensures cleanup for the specific order's map
+
+  if (!isClient) {
     return <div className="h-[300px] w-full bg-muted rounded-md flex items-center justify-center"><p>Cargando mapa...</p></div>;
   }
-
-  // Only render MapContainer if we have valid coordinates
+  
   if (!latitude || !longitude) {
     return <div className="h-[300px] w-full bg-muted rounded-md flex items-center justify-center"><p>Esperando ubicación del repartidor...</p></div>;
   }
   
   const position: LatLngExpression = [latitude, longitude];
-
-  // Effect for cleaning up the map instance on component unmount
-  useEffect(() => {
-    // This function will be called when the component unmounts
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null; // Clear the ref
-        console.log(`Leaflet map instance for order ${orderId || ''} removed.`);
-      }
-    };
-  }, [orderId]); // Re-run cleanup if orderId changes, ensuring the old map is cleaned.
 
   return (
     <MapContainer
@@ -66,8 +69,13 @@ export default function OrderTrackingMap({ latitude, longitude, orderId }: Order
       style={{ height: '300px', width: '100%' }}
       className="rounded-md shadow-md my-4 z-0"
       whenCreated={(mapInstance) => {
-        mapRef.current = mapInstance;
-        console.log(`Leaflet map instance for order ${orderId || ''} created.`);
+        // If there's an old map instance in the ref (e.g. from a HMR or race condition), remove it first
+        if (mapInstanceRef.current && mapInstanceRef.current !== mapInstance) {
+            mapInstanceRef.current.remove();
+            console.log(`PRE-CLEANUP: Stale Leaflet map instance for order ${orderId || ''} removed before new creation.`);
+        }
+        mapInstanceRef.current = mapInstance;
+        console.log(`Leaflet map instance for order ${orderId || ''} created and assigned to ref.`);
       }}
     >
       <ChangeView center={position} zoom={16} />
@@ -83,3 +91,4 @@ export default function OrderTrackingMap({ latitude, longitude, orderId }: Order
     </MapContainer>
   );
 }
+
