@@ -376,49 +376,12 @@ export default function AdminPage() {
           <CardDescription>Gestiona productos, pedidos y usuarios.</CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
-          <Tabs defaultValue="products" className="w-full">
+          <Tabs defaultValue="orders" className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-6">
-              <TabsTrigger value="products"><ShoppingBasket className="mr-2 h-5 w-5"/>Productos</TabsTrigger>
               <TabsTrigger value="orders"><ClipboardList className="mr-2 h-5 w-5"/>Pedidos</TabsTrigger>
               <TabsTrigger value="users"><Users className="mr-2 h-5 w-5"/>Usuarios</TabsTrigger>
+              <TabsTrigger value="products"><ShoppingBasket className="mr-2 h-5 w-5"/>Productos</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="products">
-              <Card>
-                <CardHeader className="border-b">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                      <CardTitle className="text-2xl font-headline flex items-center gap-2"><ShoppingBasket />Gestión de Productos</CardTitle>
-                      <CardDescription>Añade, edita o elimina productos del menú.</CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" disabled={isAnyActionInProgress}><UploadCloud />Importar Menú</Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader><AlertDialogTitle>¿Confirmar Importación?</AlertDialogTitle><AlertDialogDescription>Añadirá productos iniciales. No borrará existentes.</AlertDialogDescription></AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel disabled={isImporting}>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleImportInitialMenu} disabled={isImporting}>{isImporting && <Loader2 className="animate-spin"/>}Confirmar</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                      <Button onClick={handleOpenAddModal} disabled={isAnyActionInProgress}><PackagePlus />Añadir Producto</Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  {isLoadingProducts ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando...</div>)
-                  : productError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{productError}</AlertDescription></Alert>)
-                  : products.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Productos</AlertTitle><AlertDescription>Usa "Importar Menú" o "Añadir Producto".</AlertDescription></Alert>)
-                  : (<div className="overflow-x-auto"><Table><TableCaption>Productos en Firestore.</TableCaption><TableHeader><TableRow><TableHead>Imagen</TableHead><TableHead>Nombre</TableHead><TableHead className="hidden md:table-cell">Categoría</TableHead><TableHead className="hidden lg:table-cell max-w-[300px] truncate">Descripción</TableHead><TableHead className="text-right">Precio</TableHead><TableHead className="text-center">Acciones</TableHead></TableRow></TableHeader>
-                      <TableBody>{products.map((p) => (<TableRow key={p.id}><TableCell><Image src={p.imageUrl || DEFAULT_PLACEHOLDER_IMAGE} alt={p.name} width={48} height={48} className="rounded object-cover" data-ai-hint={p.dataAiHint}/></TableCell><TableCell className="font-medium">{p.name}</TableCell><TableCell className="hidden md:table-cell"><Badge variant="secondary">{p.category}</Badge></TableCell><TableCell className="hidden lg:table-cell text-xs max-w-[300px] truncate" title={p.description}>{p.description}</TableCell><TableCell className="text-right">€{p.price.toFixed(2)}</TableCell><TableCell className="text-center"><div className="flex justify-center gap-1 sm:gap-2"><Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenEditModal(p)} disabled={isAnyActionInProgress}><Edit /></Button><Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleOpenDeleteAlert(p)} disabled={isAnyActionInProgress}><Trash2 /></Button></div></TableCell></TableRow>))}</TableBody>
-                    </Table></div>)}
-                </CardContent>
-                <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión CRUD de productos.</p></CardFooter>
-              </Card>
-            </TabsContent>
 
             <TabsContent value="orders">
               <Card>
@@ -482,6 +445,44 @@ export default function AdminPage() {
                 <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión de roles de usuarios.</p></CardFooter>
               </Card>
             </TabsContent>
+
+            <TabsContent value="products">
+              <Card>
+                <CardHeader className="border-b">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <CardTitle className="text-2xl font-headline flex items-center gap-2"><ShoppingBasket />Gestión de Productos</CardTitle>
+                      <CardDescription>Añade, edita o elimina productos del menú.</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" disabled={isAnyActionInProgress}><UploadCloud />Importar Menú</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader><AlertDialogTitle>¿Confirmar Importación?</AlertDialogTitle><AlertDialogDescription>Añadirá productos iniciales. No borrará existentes.</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isImporting}>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleImportInitialMenu} disabled={isImporting}>{isImporting && <Loader2 className="animate-spin"/>}Confirmar</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      <Button onClick={handleOpenAddModal} disabled={isAnyActionInProgress}><PackagePlus />Añadir Producto</Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {isLoadingProducts ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando...</div>)
+                  : productError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{productError}</AlertDescription></Alert>)
+                  : products.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Productos</AlertTitle><AlertDescription>Usa "Importar Menú" o "Añadir Producto".</AlertDescription></Alert>)
+                  : (<div className="overflow-x-auto"><Table><TableCaption>Productos en Firestore.</TableCaption><TableHeader><TableRow><TableHead>Imagen</TableHead><TableHead>Nombre</TableHead><TableHead className="hidden md:table-cell">Categoría</TableHead><TableHead className="hidden lg:table-cell max-w-[300px] truncate">Descripción</TableHead><TableHead className="text-right">Precio</TableHead><TableHead className="text-center">Acciones</TableHead></TableRow></TableHeader>
+                      <TableBody>{products.map((p) => (<TableRow key={p.id}><TableCell><Image src={p.imageUrl || DEFAULT_PLACEHOLDER_IMAGE} alt={p.name} width={48} height={48} className="rounded object-cover" data-ai-hint={p.dataAiHint}/></TableCell><TableCell className="font-medium">{p.name}</TableCell><TableCell className="hidden md:table-cell"><Badge variant="secondary">{p.category}</Badge></TableCell><TableCell className="hidden lg:table-cell text-xs max-w-[300px] truncate" title={p.description}>{p.description}</TableCell><TableCell className="text-right">€{p.price.toFixed(2)}</TableCell><TableCell className="text-center"><div className="flex justify-center gap-1 sm:gap-2"><Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenEditModal(p)} disabled={isAnyActionInProgress}><Edit /></Button><Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleOpenDeleteAlert(p)} disabled={isAnyActionInProgress}><Trash2 /></Button></div></TableCell></TableRow>))}</TableBody>
+                    </Table></div>)}
+                </CardContent>
+                <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión CRUD de productos.</p></CardFooter>
+              </Card>
+            </TabsContent>
+
           </Tabs>
         </CardContent>
       </Card>
