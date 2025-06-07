@@ -5,6 +5,7 @@ import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { Toaster } from "@/components/ui/toaster";
 import Header from '@/components/layout/Header';
+import { MapPin, Phone, Facebook, Heart, Info } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Pizzería Serranillo - Pizzas y Más',
@@ -19,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="es">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -37,8 +38,58 @@ export default function RootLayout({
               <main className="flex-grow container mx-auto px-4 py-8">
                 {children}
               </main>
-              <footer className="bg-primary text-primary-foreground py-6 text-center">
-                <p className="font-body">&copy; {new Date().getFullYear()} Pizzería Serranillo. Todos los derechos reservados.</p>
+              <footer className="bg-primary text-primary-foreground py-8">
+                <div className="container mx-auto px-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start mb-6 text-sm">
+                    {/* Columna 1: Nombre y Dirección */}
+                    <div className="md:col-span-1">
+                      <h3 className="text-lg font-semibold mb-2">Pizzería Serranillo</h3>
+                      <p className="flex items-start">
+                        <MapPin className="h-4 w-4 mr-2 mt-1 shrink-0" />
+                        <span>Carretera Hellín, Siles, Andalucía 23380</span>
+                      </p>
+                    </div>
+
+                    {/* Columna 2: Teléfonos y Redes */}
+                    <div className="md:col-span-1">
+                      <h3 className="text-lg font-semibold mb-2">Contacto y Redes</h3>
+                      <p className="flex items-center mb-1">
+                        <Phone className="h-4 w-4 mr-2 shrink-0" />
+                        <span><a href="tel:625377127" className="hover:underline">625 37 71 27</a></span>
+                      </p>
+                      <p className="flex items-center mb-2">
+                         <Phone className="h-4 w-4 mr-2 shrink-0 opacity-0 md:opacity-100" /> {/* Spacer for alignment or visible icon */}
+                        <span><a href="tel:953490434" className="hover:underline">953 49 04 34</a></span>
+                      </p>
+                      <a 
+                        href="https://www.facebook.com/Pizzer%C3%ADa-Serranillo-329258410599768/" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center hover:underline"
+                        aria-label="Pizzería Serranillo en Facebook"
+                      >
+                        <Facebook className="h-4 w-4 mr-2 shrink-0" /> Facebook
+                      </a>
+                    </div>
+                    
+                    {/* Columna 3: Aviso IVA */}
+                    <div className="md:col-span-1">
+                        <h3 className="text-lg font-semibold mb-2">Importante</h3>
+                        <p className="flex items-center">
+                          <Info className="h-4 w-4 mr-2 shrink-0" />
+                          <span>IVA INCLUIDO EN TODOS LOS PRECIOS</span>
+                        </p>
+                    </div>
+                  </div>
+
+                  {/* Copyright y Diseño */}
+                  <div className="mt-8 pt-6 border-t border-primary-foreground/30 text-center text-xs text-primary-foreground/80">
+                    <p>&copy; 2025 Pizzería Serranillo. Todos los derechos reservados.</p>
+                    <p className="flex items-center justify-center gap-1 mt-1">
+                      Diseño web con cariño <Heart className="h-3 w-3 text-white fill-white" />
+                    </p>
+                  </div>
+                </div>
               </footer>
             </div>
             <Toaster />

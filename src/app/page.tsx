@@ -8,8 +8,10 @@ import type { Product } from '@/lib/types';
 import ProductCard from '@/components/products/ProductCard';
 import CartSidebar from '@/components/cart/CartSidebar';
 import { Skeleton } from '@/components/ui/skeleton'; // For loading state
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Clock } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -22,7 +24,6 @@ export default function HomePage() {
       setError(null);
       try {
         const productsCollection = collection(db, 'products');
-        // Optionally, order products by name or another field
         const q = query(productsCollection, orderBy('category'), orderBy('name'));
         const querySnapshot = await getDocs(q);
         const productsData = querySnapshot.docs.map(doc => ({
@@ -67,7 +68,7 @@ export default function HomePage() {
       );
     }
     if (!items || items.length === 0) {
-       return null; // Don't render section if no items and not loading (e.g. after fetch)
+       return null; 
     }
 
     return (
@@ -90,8 +91,30 @@ export default function HomePage() {
           ¡Bienvenido a Pizzería Serranillo!
         </h1>
         <p className="text-xl font-body text-center mb-12 text-foreground/80 max-w-2xl mx-auto">
-          Disfruta de nuestras deliciosas pizzas recién hechas, sabrosos acompañamientos, bebidas refrescantes y postres encantadores. ¡Haz tu pedido ahora para una experiencia de sabor inolvidable!
+          Disfruta de nuestras deliciosas pizzas recién hechas en horno de leña, sabrosos acompañamientos, bebidas refrescantes y postres encantadores. ¡Haz tu pedido ahora para una experiencia de sabor inolvidable!
         </p>
+
+        <section className="mb-12">
+          <Card className="max-w-md mx-auto shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-2xl font-headline text-primary flex items-center justify-center gap-2">
+                <Clock className="h-6 w-6" /> Nuestro Horario
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <div className="space-y-1 text-card-foreground">
+                <p><span className="font-semibold">Lunes:</span> 19:00 - 00:00</p>
+                <p className="text-muted-foreground"><span className="font-semibold">Martes:</span> Cerrado</p>
+                <p><span className="font-semibold">Miércoles:</span> 19:00 - 00:00</p>
+                <p><span className="font-semibold">Jueves:</span> 19:00 - 00:00</p>
+                <p><span className="font-semibold">Viernes:</span> 19:00 - 00:00</p>
+                <p><span className="font-semibold">Sábado:</span> 19:00 - 00:00</p>
+                <p><span className="font-semibold">Domingo:</span> 19:00 - 00:00</p>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
 
         {error && (
           <Alert variant="destructive" className="mb-8">
