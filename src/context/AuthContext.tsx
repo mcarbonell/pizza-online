@@ -11,7 +11,8 @@ import {
   createUserWithEmailAndPassword, 
   signOut,
   updateProfile,
-  signInWithPopup, // Import signInWithPopup
+  signInWithPopup, 
+  sendPasswordResetEmail, // Import sendPasswordResetEmail
   type User as FirebaseUser
 } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -21,7 +22,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
-  loginWithGoogle: () => Promise<void>; // Added loginWithGoogle
+  loginWithGoogle: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>; // Added resetPassword
   isLoading: boolean;
 }
 
@@ -90,7 +92,8 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Registro exitoso", description: "¡Bienvenido a PizzaPlace!" });
-    } catch (error: any) {
+    } catch (error: any)
+{
       console.error("Error during signup:", error);
       toast({ title: "Error al registrarse", description: error.message || "No se pudo crear la cuenta.", variant: "destructive" });
       setUser(null);
@@ -103,8 +106,6 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     setIsLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      // onAuthStateChanged will handle setting the user state.
-      // Firebase automatically manages persistence.
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Inicio de sesión con Google exitoso", description: `¡Bienvenido, ${result.user.displayName || result.user.email}!` });
@@ -122,6 +123,27 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         toast({ title: "Error al iniciar sesión con Google", description: errorMessage, variant: "destructive" });
       }
       setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    setIsLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast({
+        title: "Correo enviado",
+        description: "Si tu correo está registrado, recibirás un enlace para restablecer tu contraseña.",
+      });
+      router.push('/login');
+    } catch (error: any) {
+      console.error("Error sending password reset email:", error);
+      toast({
+        title: "Error al enviar correo",
+        description: error.message || "No se pudo enviar el correo de restablecimiento.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -148,7 +170,8 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         login,
         signup,
         logout,
-        loginWithGoogle, // Added
+        loginWithGoogle,
+        resetPassword, // Added
         isLoading,
       }}
     >

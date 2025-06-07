@@ -25,8 +25,8 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
 - [x] **Autenticación de Usuarios (Firebase Auth - Fase 3 - Proveedores Sociales):**
     - [x] Añadir opción de inicio de sesión con Google.
     - [ ] Añadir opción de inicio de sesión con Facebook (opcional).
-- [ ] **Manejo de Contraseñas Avanzado (Firebase Auth):**
-    - [ ] Implementar funcionalidad de "Olvidé mi contraseña" (restablecimiento de contraseña por correo).
+- [x] **Manejo de Contraseñas Avanzado (Firebase Auth):**
+    - [x] Implementar funcionalidad de "Olvidé mi contraseña" (restablecimiento de contraseña por correo).
     - [ ] Opción de cambiar contraseña desde el perfil del usuario.
 - [ ] **Verificación de Correo Electrónico (Firebase Auth):**
     - [ ] Enviar correo de verificación al registrarse.

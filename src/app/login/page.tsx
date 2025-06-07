@@ -68,7 +68,7 @@ export default function LoginPage() {
     }
   }
 
-  if (authIsLoading && !user) { // Show loading only if not yet redirected by useEffect
+  if (authIsLoading && !user) { 
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-20rem)] py-12">
         <p className="text-lg text-muted-foreground">Cargando...</p>
@@ -76,7 +76,7 @@ export default function LoginPage() {
     );
   }
   
-  if (user && !authIsLoading) { // If user is loaded and present, useEffect will handle redirect
+  if (user && !authIsLoading) { 
      return (
       <div className="flex justify-center items-center min-h-[calc(100vh-20rem)] py-12">
         <p className="text-lg text-muted-foreground">Ya has iniciado sesión. Redirigiendo...</p>
@@ -112,7 +112,14 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Contraseña</FormLabel>
+                    <div className="flex justify-between items-center">
+                        <FormLabel>Contraseña</FormLabel>
+                        <Button variant="link" asChild className="p-0 h-auto text-xs text-muted-foreground hover:text-primary">
+                            <Link href="/forgot-password">
+                                ¿Olvidaste tu contraseña?
+                            </Link>
+                        </Button>
+                    </div>
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>
@@ -144,7 +151,6 @@ export default function LoginPage() {
               try {
                 await loginWithGoogle();
               } catch (error) {
-                // Error is typically handled in AuthContext
                 console.error("Login page Google button error:", error);
               }
             }}
