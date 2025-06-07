@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, CreditCardIcon, KeyRound, AlertTriangle, MailCheck, MailWarning } from 'lucide-react';
+import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, CreditCardIcon, KeyRound, AlertTriangle, MailCheck, MailWarning, ListOrdered, UserCog } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import type { Order, UpdateUserProfileFormValues, ShippingAddressDetails, SimulatedPaymentMethod } from '@/lib/types'; 
@@ -23,7 +23,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import Link from "next/link"; // Added missing import
+import Link from "next/link";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "La contraseña actual es requerida."),
@@ -217,259 +218,269 @@ export default function ProfilePage() {
 
   return (
     <div className="container mx-auto py-12 px-4 max-w-4xl">
-      {user && !user.emailVerified && hasPasswordProvider && (
-        <Alert variant="default" className="mb-6 bg-yellow-50 border-yellow-300 text-yellow-700">
-          <MailWarning className="h-5 w-5 text-yellow-600" />
-          <AlertTitle className="font-semibold text-yellow-800">Verifica tu correo electrónico</AlertTitle>
-          <AlertDescription>
-            Tu dirección de correo electrónico aún no ha sido verificada. Por favor, revisa tu bandeja de entrada para el correo de verificación.
-            <Button variant="link" className="p-0 h-auto ml-1 text-yellow-700 hover:text-yellow-800" onClick={resendVerificationEmail} disabled={authIsLoading}>
-              Reenviar correo
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-      <Card className="shadow-xl mb-12">
-        <CardHeader className="text-center">
+      <Card className="shadow-xl">
+        <CardHeader className="text-center border-b pb-6">
           <UserCircle className="mx-auto h-24 w-24 text-primary mb-4" />
           <CardTitle className="text-3xl font-headline">{userProfile?.displayName || user.email?.split('@')[0] || 'Mi Perfil'}</CardTitle>
-          <CardDescription>Gestiona la información de tu cuenta PizzaPlace.</CardDescription>
+          <CardDescription>Gestiona la información de tu cuenta y pedidos.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-3">
-            {userProfile?.email && (
-              <div className="flex items-center justify-between gap-3 p-3 bg-muted/30 rounded-lg">
-                <div className="flex items-center gap-3">
-                    <Mail className="h-5 w-5 text-primary" />
+        <CardContent className="pt-6">
+          <Tabs defaultValue="account" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="account"><UserCog className="mr-2 h-5 w-5"/>Detalles de Cuenta</TabsTrigger>
+              <TabsTrigger value="orders"><ListOrdered className="mr-2 h-5 w-5"/>Historial de Pedidos</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="account" className="space-y-6">
+              {user && !user.emailVerified && hasPasswordProvider && (
+                <Alert variant="default" className="bg-yellow-50 border-yellow-300 text-yellow-700">
+                  <MailWarning className="h-5 w-5 text-yellow-600" />
+                  <AlertTitle className="font-semibold text-yellow-800">Verifica tu correo electrónico</AlertTitle>
+                  <AlertDescription>
+                    Tu dirección de correo electrónico aún no ha sido verificada. Por favor, revisa tu bandeja de entrada para el correo de verificación.
+                    <Button variant="link" className="p-0 h-auto ml-1 text-yellow-700 hover:text-yellow-800" onClick={resendVerificationEmail} disabled={authIsLoading}>
+                      Reenviar correo
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className="space-y-3">
+                {userProfile?.email && (
+                  <div className="flex items-center justify-between gap-3 p-3 bg-muted/30 rounded-lg">
+                    <div className="flex items-center gap-3">
+                        <Mail className="h-5 w-5 text-primary" />
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Correo Electrónico</p>
+                          <p className="text-md font-semibold">{userProfile.email}</p>
+                        </div>
+                    </div>
+                    {user.emailVerified ? (
+                        <Badge variant="default" className="bg-green-100 text-green-700 border-green-300 hover:bg-green-100">
+                            <MailCheck className="mr-1.5 h-4 w-4" /> Verificado
+                        </Badge>
+                    ) : (
+                        <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-100">
+                            <MailWarning className="mr-1.5 h-4 w-4" /> No Verificado
+                        </Badge>
+                    )}
+                  </div>
+                )}
+                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                    <UserCircle className="h-5 w-5 text-primary" /> 
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Correo Electrónico</p>
-                      <p className="text-md font-semibold">{userProfile.email}</p>
+                        <p className="text-sm font-medium text-muted-foreground">User ID (UID)</p>
+                        <p className="text-md font-semibold break-all">{user.uid}</p>
                     </div>
                 </div>
-                {user.emailVerified ? (
-                    <Badge variant="default" className="bg-green-100 text-green-700 border-green-300 hover:bg-green-100">
-                        <MailCheck className="mr-1.5 h-4 w-4" /> Verificado
-                    </Badge>
-                ) : (
-                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-100">
-                        <MailWarning className="mr-1.5 h-4 w-4" /> No Verificado
-                    </Badge>
+                {userProfile?.defaultShippingAddress && (userProfile.defaultShippingAddress.name || userProfile.defaultShippingAddress.address) && (
+                  <Card className="mt-4">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-headline flex items-center gap-2"><Home className="h-5 w-5"/> Dirección de Envío Predeterminada</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-1">
+                      <p><strong>Nombre:</strong> {userProfile.defaultShippingAddress.name}</p>
+                      <p><strong>Email:</strong> {userProfile.defaultShippingAddress.email}</p>
+                      <p><strong>Dirección:</strong> {userProfile.defaultShippingAddress.address}, {userProfile.defaultShippingAddress.city}, {userProfile.defaultShippingAddress.postalCode}</p>
+                      {userProfile.defaultShippingAddress.phone && <p><strong><Phone className="inline h-4 w-4 mr-1"/>Teléfono:</strong> {userProfile.defaultShippingAddress.phone}</p>}
+                    </CardContent>
+                  </Card>
+                )}
+                {userProfile?.defaultPaymentMethod && userProfile.defaultPaymentMethod.last4Digits && (
+                  <Card className="mt-4">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-headline flex items-center gap-2"><CreditCardIcon className="h-5 w-5"/> Método de Pago Predeterminado (Simulado)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-1">
+                      <p><strong>Tarjeta terminada en:</strong> •••• {userProfile.defaultPaymentMethod.last4Digits}</p>
+                      <p><strong>Fecha de caducidad:</strong> {userProfile.defaultPaymentMethod.expiryDate}</p>
+                      <p className="text-xs text-muted-foreground">(Solo se almacenan los últimos 4 dígitos y la fecha de caducidad. CVV nunca se guarda.)</p>
+                    </CardContent>
+                  </Card>
                 )}
               </div>
-            )}
-             <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                <UserCircle className="h-5 w-5 text-primary" /> 
-                <div>
-                    <p className="text-sm font-medium text-muted-foreground">User ID (UID)</p>
-                    <p className="text-md font-semibold break-all">{user.uid}</p>
-                </div>
-            </div>
-            {userProfile?.defaultShippingAddress && (userProfile.defaultShippingAddress.name || userProfile.defaultShippingAddress.address) && (
-              <Card className="mt-4">
-                <CardHeader>
-                  <CardTitle className="text-lg font-headline flex items-center gap-2"><Home className="h-5 w-5"/> Dirección de Envío Predeterminada</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm space-y-1">
-                  <p><strong>Nombre:</strong> {userProfile.defaultShippingAddress.name}</p>
-                  <p><strong>Email:</strong> {userProfile.defaultShippingAddress.email}</p>
-                  <p><strong>Dirección:</strong> {userProfile.defaultShippingAddress.address}, {userProfile.defaultShippingAddress.city}, {userProfile.defaultShippingAddress.postalCode}</p>
-                  {userProfile.defaultShippingAddress.phone && <p><strong><Phone className="inline h-4 w-4 mr-1"/>Teléfono:</strong> {userProfile.defaultShippingAddress.phone}</p>}
-                </CardContent>
-              </Card>
-            )}
-            {userProfile?.defaultPaymentMethod && userProfile.defaultPaymentMethod.last4Digits && (
-              <Card className="mt-4">
-                <CardHeader>
-                  <CardTitle className="text-lg font-headline flex items-center gap-2"><CreditCardIcon className="h-5 w-5"/> Método de Pago Predeterminado (Simulado)</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm space-y-1">
-                  <p><strong>Tarjeta terminada en:</strong> •••• {userProfile.defaultPaymentMethod.last4Digits}</p>
-                  <p><strong>Fecha de caducidad:</strong> {userProfile.defaultPaymentMethod.expiryDate}</p>
-                  <p className="text-xs text-muted-foreground">(Solo se almacenan los últimos 4 dígitos y la fecha de caducidad. CVV nunca se guarda.)</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-            <Dialog open={isEditProfileDialogOpen} onOpenChange={setIsEditProfileDialogOpen}>
-                <DialogTrigger asChild>
-                    <Button variant="outline">
-                        <Edit3 /> Editar Perfil y Preferencias
-                    </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-lg max-h-[90vh]">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2"><Edit3/> Editar Perfil</DialogTitle>
-                        <DialogDescription>
-                            Actualiza tu nombre, dirección de envío predeterminada y método de pago simulado.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <ScrollArea className="max-h-[60vh] p-1 pr-5">
-                    <Form {...editProfileForm}>
-                        <form onSubmit={editProfileForm.handleSubmit(onSubmitEditProfile)} className="space-y-6 py-4">
-                            <FormField
-                                control={editProfileForm.control}
-                                name="displayName"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Nombre Público</FormLabel>
-                                        <FormControl><Input placeholder="Tu nombre" {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <Accordion type="multiple" className="w-full" defaultValue={['shipping', 'payment']}>
-                                <AccordionItem value="shipping">
-                                    <AccordionTrigger className="text-lg font-semibold">Dirección de Envío Predeterminada</AccordionTrigger>
-                                    <AccordionContent className="space-y-4 pt-4">
-                                        <FormField control={editProfileForm.control} name="shippingName" render={({ field }) => ( <FormItem> <FormLabel>Nombre del destinatario</FormLabel> <FormControl><Input placeholder="Nombre completo" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                                        <FormField control={editProfileForm.control} name="shippingEmail" render={({ field }) => ( <FormItem> <FormLabel>Email de contacto</FormLabel> <FormControl><Input type="email" placeholder="email@ejemplo.com" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                                        <FormField control={editProfileForm.control} name="shippingAddress" render={({ field }) => ( <FormItem> <FormLabel>Dirección</FormLabel> <FormControl><Input placeholder="Calle, Número, etc." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                                        <div className="grid grid-cols-2 gap-4">
-                                          <FormField control={editProfileForm.control} name="shippingCity" render={({ field }) => ( <FormItem> <FormLabel>Ciudad</FormLabel> <FormControl><Input placeholder="Ciudad" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                                          <FormField control={editProfileForm.control} name="shippingPostalCode" render={({ field }) => ( <FormItem> <FormLabel>Código Postal</FormLabel> <FormControl><Input placeholder="C.P." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                                        </div>
-                                        <FormField control={editProfileForm.control} name="shippingPhone" render={({ field }) => ( <FormItem> <FormLabel>Teléfono (Opcional)</FormLabel> <FormControl><Input placeholder="Número de teléfono" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                                    </AccordionContent>
-                                </AccordionItem>
-                                <AccordionItem value="payment">
-                                    <AccordionTrigger className="text-lg font-semibold">Pago Predeterminado (Simulado)</AccordionTrigger>
-                                    <AccordionContent className="space-y-4 pt-4">
-                                        <FormField control={editProfileForm.control} name="paymentLast4Digits" render={({ field }) => ( <FormItem> <FormLabel>Últimos 4 dígitos de la tarjeta</FormLabel> <FormControl><Input placeholder="1234" {...field} maxLength={4} /></FormControl> <FormMessage /> </FormItem> )}/>
-                                        <FormField control={editProfileForm.control} name="paymentExpiryDate" render={({ field }) => ( <FormItem> <FormLabel>Fecha de caducidad (MM/AA)</FormLabel> <FormControl><Input placeholder="MM/AA" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                                    </AccordionContent>
-                                </AccordionItem>
-                            </Accordion>
-                             <DialogFooter className="mt-6">
-                                <DialogClose asChild><Button type="button" variant="ghost">Cancelar</Button></DialogClose>
-                                <Button type="submit" disabled={editProfileForm.formState.isSubmitting || authIsLoading}>
-                                    {editProfileForm.formState.isSubmitting || authIsLoading ? 'Guardando...' : 'Guardar Cambios'}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </Form>
-                    </ScrollArea>
-                </DialogContent>
-            </Dialog>
-            
-            <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
-              <TooltipProvider>
-                <Tooltip open={!hasPasswordProvider ? undefined : false }>
-                  <TooltipTrigger asChild>
-                    <span tabIndex={hasPasswordProvider ? -1 : 0} className="w-full"> 
-                      <Button variant="outline" disabled={!hasPasswordProvider} onClick={() => hasPasswordProvider && setIsPasswordDialogOpen(true)} className="w-full">
-                        <ShieldCheck /> Cambiar Contraseña
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {!hasPasswordProvider && (
-                    <TooltipContent>
-                      <p className="flex items-center gap-1"><AlertTriangle className="h-4 w-4 text-amber-500" />No puedes cambiar la contraseña porque iniciaste sesión con un proveedor externo (ej. Google).</p>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
-
-              {hasPasswordProvider && (
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2"><KeyRound/> Cambiar Contraseña</DialogTitle>
-                    <DialogDescription>Introduce tu contraseña actual y la nueva contraseña.</DialogDescription>
-                  </DialogHeader>
-                  <Form {...passwordForm}>
-                    <form onSubmit={passwordForm.handleSubmit(onSubmitPasswordChange)} className="space-y-4 py-4">
-                      <FormField control={passwordForm.control} name="currentPassword" render={({ field }) => ( <FormItem> <FormLabel>Contraseña Actual</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                      <FormField control={passwordForm.control} name="newPassword" render={({ field }) => ( <FormItem> <FormLabel>Nueva Contraseña</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                      <FormField control={passwordForm.control} name="confirmNewPassword" render={({ field }) => ( <FormItem> <FormLabel>Confirmar Nueva Contraseña</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                      <DialogFooter>
-                        <DialogClose asChild><Button type="button" variant="ghost">Cancelar</Button></DialogClose>
-                        <Button type="submit" disabled={passwordForm.formState.isSubmitting || authIsLoading}>
-                          {passwordForm.formState.isSubmitting || authIsLoading ? 'Actualizando...' : 'Actualizar Contraseña'}
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                <Dialog open={isEditProfileDialogOpen} onOpenChange={setIsEditProfileDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" className="w-full">
+                            <Edit3 /> Editar Perfil y Preferencias
                         </Button>
-                      </DialogFooter>
-                    </form>
-                  </Form>
-                </DialogContent>
-              )}
-            </Dialog>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-lg max-h-[90vh]">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2"><Edit3/> Editar Perfil</DialogTitle>
+                            <DialogDescription>
+                                Actualiza tu nombre, dirección de envío predeterminada y método de pago simulado.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="max-h-[60vh] p-1 pr-5">
+                        <Form {...editProfileForm}>
+                            <form onSubmit={editProfileForm.handleSubmit(onSubmitEditProfile)} className="space-y-6 py-4">
+                                <FormField
+                                    control={editProfileForm.control}
+                                    name="displayName"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Nombre Público</FormLabel>
+                                            <FormControl><Input placeholder="Tu nombre" {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <Accordion type="multiple" className="w-full" defaultValue={['shipping', 'payment']}>
+                                    <AccordionItem value="shipping">
+                                        <AccordionTrigger className="text-lg font-semibold">Dirección de Envío Predeterminada</AccordionTrigger>
+                                        <AccordionContent className="space-y-4 pt-4">
+                                            <FormField control={editProfileForm.control} name="shippingName" render={({ field }) => ( <FormItem> <FormLabel>Nombre del destinatario</FormLabel> <FormControl><Input placeholder="Nombre completo" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                            <FormField control={editProfileForm.control} name="shippingEmail" render={({ field }) => ( <FormItem> <FormLabel>Email de contacto</FormLabel> <FormControl><Input type="email" placeholder="email@ejemplo.com" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                            <FormField control={editProfileForm.control} name="shippingAddress" render={({ field }) => ( <FormItem> <FormLabel>Dirección</FormLabel> <FormControl><Input placeholder="Calle, Número, etc." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                            <div className="grid grid-cols-2 gap-4">
+                                              <FormField control={editProfileForm.control} name="shippingCity" render={({ field }) => ( <FormItem> <FormLabel>Ciudad</FormLabel> <FormControl><Input placeholder="Ciudad" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                              <FormField control={editProfileForm.control} name="shippingPostalCode" render={({ field }) => ( <FormItem> <FormLabel>Código Postal</FormLabel> <FormControl><Input placeholder="C.P." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                            </div>
+                                            <FormField control={editProfileForm.control} name="shippingPhone" render={({ field }) => ( <FormItem> <FormLabel>Teléfono (Opcional)</FormLabel> <FormControl><Input placeholder="Número de teléfono" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                    <AccordionItem value="payment">
+                                        <AccordionTrigger className="text-lg font-semibold">Pago Predeterminado (Simulado)</AccordionTrigger>
+                                        <AccordionContent className="space-y-4 pt-4">
+                                            <FormField control={editProfileForm.control} name="paymentLast4Digits" render={({ field }) => ( <FormItem> <FormLabel>Últimos 4 dígitos de la tarjeta</FormLabel> <FormControl><Input placeholder="1234" {...field} maxLength={4} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                            <FormField control={editProfileForm.control} name="paymentExpiryDate" render={({ field }) => ( <FormItem> <FormLabel>Fecha de caducidad (MM/AA)</FormLabel> <FormControl><Input placeholder="MM/AA" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                </Accordion>
+                                <DialogFooter className="mt-6">
+                                    <DialogClose asChild><Button type="button" variant="ghost">Cancelar</Button></DialogClose>
+                                    <Button type="submit" disabled={editProfileForm.formState.isSubmitting || authIsLoading}>
+                                        {editProfileForm.formState.isSubmitting || authIsLoading ? 'Guardando...' : 'Guardar Cambios'}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </Form>
+                        </ScrollArea>
+                    </DialogContent>
+                </Dialog>
+                
+                <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+                  <TooltipProvider>
+                    <Tooltip open={!hasPasswordProvider ? undefined : false }>
+                      <TooltipTrigger asChild>
+                        <span tabIndex={hasPasswordProvider ? -1 : 0} className="w-full"> 
+                          <Button variant="outline" disabled={!hasPasswordProvider} onClick={() => hasPasswordProvider && setIsPasswordDialogOpen(true)} className="w-full">
+                            <ShieldCheck /> Cambiar Contraseña
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!hasPasswordProvider && (
+                        <TooltipContent>
+                          <p className="flex items-center gap-1"><AlertTriangle className="h-4 w-4 text-amber-500" />No puedes cambiar la contraseña porque iniciaste sesión con un proveedor externo (ej. Google).</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
 
-          </div>
+                  {hasPasswordProvider && (
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2"><KeyRound/> Cambiar Contraseña</DialogTitle>
+                        <DialogDescription>Introduce tu contraseña actual y la nueva contraseña.</DialogDescription>
+                      </DialogHeader>
+                      <Form {...passwordForm}>
+                        <form onSubmit={passwordForm.handleSubmit(onSubmitPasswordChange)} className="space-y-4 py-4">
+                          <FormField control={passwordForm.control} name="currentPassword" render={({ field }) => ( <FormItem> <FormLabel>Contraseña Actual</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                          <FormField control={passwordForm.control} name="newPassword" render={({ field }) => ( <FormItem> <FormLabel>Nueva Contraseña</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                          <FormField control={passwordForm.control} name="confirmNewPassword" render={({ field }) => ( <FormItem> <FormLabel>Confirmar Nueva Contraseña</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                          <DialogFooter>
+                            <DialogClose asChild><Button type="button" variant="ghost">Cancelar</Button></DialogClose>
+                            <Button type="submit" disabled={passwordForm.formState.isSubmitting || authIsLoading}>
+                              {passwordForm.formState.isSubmitting || authIsLoading ? 'Actualizando...' : 'Actualizar Contraseña'}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  )}
+                </Dialog>
+              </div>
+            </TabsContent>
 
-          <Button onClick={logout} variant="destructive" className="w-full mt-6" disabled={authIsLoading}>
+            <TabsContent value="orders">
+              <section>
+                <h2 className="text-2xl font-headline mb-6 text-center text-primary flex items-center justify-center gap-2">
+                  <ShoppingBag /> Mis Pedidos
+                </h2>
+                {isLoadingOrders ? (
+                  <div className="text-center py-10"><p className="text-lg text-muted-foreground">Cargando tus pedidos...</p></div>
+                ) : orders.length === 0 ? (
+                  <div className="text-center py-10">
+                    <Package className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+                    <p className="text-lg text-muted-foreground">Aún no has realizado ningún pedido.</p>
+                    <Button asChild variant="link" className="mt-4 text-primary"><Link href="/">Ir al Menú</Link></Button>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {orders.map((order) => (
+                      <Card key={order.id} className="shadow-lg">
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="font-headline text-xl md:text-2xl mb-1 flex items-center gap-2">
+                                <Hash /> Pedido #{order.id?.substring(0, 8)}...
+                              </CardTitle>
+                              <CardDescription className="flex items-center gap-1.5 text-xs md:text-sm">
+                                <CalendarDays className="h-4 w-4" /> {formatDate(order.createdAt)}
+                              </CardDescription>
+                            </div>
+                            <Badge variant={order.status === 'Pending' ? 'secondary' : 'default'} className="mt-1">{order.status}</Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <Accordion type="single" collapsible className="w-full">
+                            <AccordionItem value="items">
+                              <AccordionTrigger className="text-base font-semibold">Ver {order.items.length} Artículo(s)</AccordionTrigger>
+                              <AccordionContent>
+                                <ul className="space-y-3 pt-2">
+                                  {order.items.map((item) => (
+                                    <li key={item.id} className="flex items-center justify-between gap-3 p-2 rounded-md bg-muted/20">
+                                      <div className="flex items-center gap-3">
+                                        <Image src={item.imageUrl} alt={item.name} width={40} height={40} className="rounded object-cover" data-ai-hint={item.dataAiHint}/>
+                                        <div><p className="font-semibold text-sm">{item.name}</p><p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p></div>
+                                      </div>
+                                      <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="shipping">
+                              <AccordionTrigger className="text-base font-semibold">Detalles de Envío</AccordionTrigger>
+                              <AccordionContent className="text-sm space-y-1 pt-2">
+                                <p><strong>Nombre:</strong> {order.shippingAddress.name}</p>
+                                <p><strong>Email:</strong> {order.shippingAddress.email}</p>
+                                <p><strong>Dirección:</strong> {order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.postalCode}</p>
+                                {order.shippingAddress.phone && <p><strong>Teléfono:</strong> {order.shippingAddress.phone}</p>}
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        </CardContent>
+                        <CardFooter className="bg-muted/30 p-4 rounded-b-lg flex justify-end items-center">
+                          <div className="flex items-center gap-1.5 text-lg font-bold text-primary"><DollarSign className="h-5 w-5" />Total: ${order.totalAmount.toFixed(2)}</div>
+                        </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+        <CardFooter className="border-t pt-6">
+          <Button onClick={logout} variant="destructive" className="w-full" disabled={authIsLoading}>
             <LogOut />
             {authIsLoading ? 'Cerrando sesión...' : 'Cerrar Sesión'}
           </Button>
-        </CardContent>
+        </CardFooter>
       </Card>
-
-      <section>
-        <h2 className="text-3xl font-headline mb-8 text-center text-primary flex items-center justify-center gap-2">
-          <ShoppingBag /> Mis Pedidos
-        </h2>
-        {isLoadingOrders ? (
-          <div className="text-center py-10"><p className="text-lg text-muted-foreground">Cargando tus pedidos...</p></div>
-        ) : orders.length === 0 ? (
-          <div className="text-center py-10">
-            <Package className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <p className="text-lg text-muted-foreground">Aún no has realizado ningún pedido.</p>
-            <Button asChild variant="link" className="mt-4 text-primary"><Link href="/">Ir al Menú</Link></Button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {orders.map((order) => (
-              <Card key={order.id} className="shadow-lg">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="font-headline text-xl md:text-2xl mb-1 flex items-center gap-2">
-                        <Hash /> Pedido #{order.id?.substring(0, 8)}...
-                      </CardTitle>
-                      <CardDescription className="flex items-center gap-1.5 text-xs md:text-sm">
-                        <CalendarDays className="h-4 w-4" /> {formatDate(order.createdAt)}
-                      </CardDescription>
-                    </div>
-                    <Badge variant={order.status === 'Pending' ? 'secondary' : 'default'} className="mt-1">{order.status}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Accordion type="single" collapsible className="w-full">
-                    <AccordionItem value="items">
-                      <AccordionTrigger className="text-base font-semibold">Ver {order.items.length} Artículo(s)</AccordionTrigger>
-                      <AccordionContent>
-                        <ul className="space-y-3 pt-2">
-                          {order.items.map((item) => (
-                            <li key={item.id} className="flex items-center justify-between gap-3 p-2 rounded-md bg-muted/20">
-                              <div className="flex items-center gap-3">
-                                <Image src={item.imageUrl} alt={item.name} width={40} height={40} className="rounded object-cover" data-ai-hint={item.dataAiHint}/>
-                                <div><p className="font-semibold text-sm">{item.name}</p><p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p></div>
-                              </div>
-                              <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      </AccordionContent>
-                    </AccordionItem>
-                    <AccordionItem value="shipping">
-                      <AccordionTrigger className="text-base font-semibold">Detalles de Envío</AccordionTrigger>
-                      <AccordionContent className="text-sm space-y-1 pt-2">
-                        <p><strong>Nombre:</strong> {order.shippingAddress.name}</p>
-                        <p><strong>Email:</strong> {order.shippingAddress.email}</p>
-                        <p><strong>Dirección:</strong> {order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.postalCode}</p>
-                         {order.shippingAddress.phone && <p><strong>Teléfono:</strong> {order.shippingAddress.phone}</p>}
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
-                </CardContent>
-                <CardFooter className="bg-muted/30 p-4 rounded-b-lg flex justify-end items-center">
-                  <div className="flex items-center gap-1.5 text-lg font-bold text-primary"><DollarSign className="h-5 w-5" />Total: ${order.totalAmount.toFixed(2)}</div>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }
-
