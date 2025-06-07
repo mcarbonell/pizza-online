@@ -6,9 +6,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save } from 'lucide-react';
-import { db } from '@/lib/firebase';
+import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus } from 'lucide-react';
+import { db, storage } from '@/lib/firebase'; // Import storage
 import { collection, getDocs, query, orderBy, writeBatch, doc, updateDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"; // Storage imports
 import type { Product } from '@/lib/types';
 import { initialProductData } from '@/data/products';
 import { useToast } from '@/hooks/use-toast';
@@ -46,13 +47,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress"; // Import Progress component
 
 const productCategories = ['Pizzas', 'Sides', 'Drinks', 'Desserts'] as const;
 
@@ -70,7 +71,8 @@ const productFormSchema = z.object({
   category: z.enum(productCategories, {
     errorMap: () => ({ message: "Por favor selecciona una categoría válida." }),
   }),
-  imageUrl: z.string().url({ message: "Por favor introduce una URL de imagen válida." }).or(z.literal('')),
+  // imageUrl is still a string, as it stores the download URL. The file upload will populate this.
+  imageUrl: z.string().url({ message: "Se requiere una URL de imagen válida o subir una nueva imagen." }).or(z.literal('')),
   dataAiHint: z.string().optional(),
 });
 
@@ -88,6 +90,13 @@ export default function AdminPage() {
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // States for image upload
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
@@ -140,13 +149,27 @@ export default function AdminPage() {
         name: editingProduct.name,
         description: editingProduct.description,
         price: editingProduct.price,
-        category: editingProduct.category as typeof productCategories[number], // Cast needed if Product category is wider
-        imageUrl: editingProduct.imageUrl,
+        category: editingProduct.category as typeof productCategories[number],
+        imageUrl: editingProduct.imageUrl, // This will be the current URL
         dataAiHint: editingProduct.dataAiHint || "",
       });
+      setImageFile(null); // Reset file states when a new product is selected for editing
+      setImagePreview(null);
+      setUploadProgress(null);
     }
   }, [editingProduct, form]);
 
+
+  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    } else {
+      setImageFile(null);
+      setImagePreview(null);
+    }
+  };
 
   const handleImportInitialMenu = async () => {
     setIsImporting(true);
@@ -155,7 +178,7 @@ export default function AdminPage() {
       const productsCollection = collection(db, 'products');
 
       initialProductData.forEach(productData => {
-        const newProductRef = doc(productsCollection); // Firestore generates ID
+        const newProductRef = doc(productsCollection); 
         batch.set(newProductRef, productData);
       });
 
@@ -183,27 +206,73 @@ export default function AdminPage() {
     setIsEditModalOpen(true);
   };
 
-  const handleUpdateProduct = async (data: ProductFormValues) => {
+  const handleUpdateProduct = async (formData: ProductFormValues) => {
     if (!editingProduct) return;
 
+    setIsUploading(true); // Indicate start of general update process
+    setUploadProgress(0); // Reset progress for potential new upload
+
+    let finalImageUrl = formData.imageUrl; // Use existing imageUrl from form by default
+
     try {
+      if (imageFile) { // If a new file was selected for upload
+        const imageStorageRef = storageRef(storage, `products/${editingProduct.id}/${imageFile.name}`);
+        const uploadTask = uploadBytesResumable(imageStorageRef, imageFile);
+
+        await new Promise<void>((resolve, reject) => {
+          uploadTask.on('state_changed',
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(progress);
+            },
+            (error) => {
+              console.error("Upload failed:", error);
+              toast({
+                title: "Error al Subir Imagen",
+                description: "No se pudo subir la nueva imagen. Verifica las reglas de Storage y la consola.",
+                variant: "destructive",
+              });
+              reject(error);
+            },
+            async () => {
+              finalImageUrl = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve();
+            }
+          );
+        });
+      }
+
+      // Prepare data for Firestore update, ensuring imageUrl is the potentially new one
+      const productDataToUpdate: ProductFormValues = {
+        ...formData,
+        imageUrl: finalImageUrl,
+      };
+      
       const productRef = doc(db, 'products', editingProduct.id);
-      await updateDoc(productRef, data);
+      await updateDoc(productRef, productDataToUpdate);
+      
       toast({
         title: "Producto Actualizado",
-        description: `El producto "${data.name}" ha sido actualizado correctamente.`,
+        description: `El producto "${productDataToUpdate.name}" ha sido actualizado correctamente.`,
         variant: "default",
       });
       setIsEditModalOpen(false);
       setEditingProduct(null);
+      setImageFile(null);
+      setImagePreview(null);
       fetchProducts();
+
     } catch (error) {
-      console.error("Error updating product:", error);
+      // This catch block handles errors from Firestore update or from the image upload promise rejection
+      console.error("Error updating product or uploading image:", error);
       toast({
         title: "Error al Actualizar",
         description: "No se pudo actualizar el producto. Revisa la consola para más detalles.",
         variant: "destructive",
       });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -361,6 +430,10 @@ export default function AdminPage() {
         if (!isOpen) {
           setEditingProduct(null);
           form.reset();
+          setImageFile(null);
+          setImagePreview(null);
+          setUploadProgress(null);
+          setIsUploading(false);
         }
       }}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
@@ -429,17 +502,43 @@ export default function AdminPage() {
                   )}
                 />
               </div>
-              <FormField
-                control={form.control}
-                name="imageUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>URL de la Imagen</FormLabel>
-                    <FormControl><Input placeholder="https://ejemplo.com/imagen.png" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              
+              {/* Image Upload Section */}
+              <FormItem>
+                <FormLabel>Imagen del Producto</FormLabel>
+                <div className="space-y-2">
+                  {(imagePreview || (editingProduct && editingProduct.imageUrl)) && (
+                    <div className="relative w-full h-48 rounded-md overflow-hidden border">
+                      <Image
+                        src={imagePreview || editingProduct?.imageUrl || 'https://placehold.co/600x400.png'}
+                        alt={editingProduct?.name || "Vista previa"}
+                        layout="fill"
+                        objectFit="cover"
+                      />
+                    </div>
+                  )}
+                  <FormControl>
+                    <div className="flex items-center gap-2">
+                       <Button type="button" variant="outline" size="sm" asChild>
+                        <label htmlFor="image-upload" className="cursor-pointer flex items-center gap-2">
+                           <ImagePlus className="h-4 w-4" />
+                           {imageFile ? "Cambiar imagen" : "Subir imagen"}
+                        </label>
+                      </Button>
+                      <Input id="image-upload" type="file" accept="image/*" onChange={handleImageFileChange} className="hidden" />
+                      {imageFile && <span className="text-xs text-muted-foreground truncate max-w-[150px]">{imageFile.name}</span>}
+                    </div>
+                  </FormControl>
+                  {isUploading && uploadProgress !== null && (
+                    <div className="space-y-1">
+                       <Progress value={uploadProgress} className="w-full h-2" />
+                       <p className="text-xs text-muted-foreground text-center">{Math.round(uploadProgress)}% subido</p>
+                    </div>
+                  )}
+                  <FormMessage>{form.formState.errors.imageUrl?.message}</FormMessage>
+                </div>
+              </FormItem>
+
               <FormField
                 control={form.control}
                 name="dataAiHint"
@@ -455,9 +554,9 @@ export default function AdminPage() {
                 <DialogClose asChild>
                   <Button type="button" variant="ghost">Cancelar</Button>
                 </DialogClose>
-                <Button type="submit" disabled={form.formState.isSubmitting}>
-                  {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Guardar Cambios
+                <Button type="submit" disabled={isUploading || form.formState.isSubmitting}>
+                  {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  {isUploading ? 'Subiendo...' : 'Guardar Cambios'}
                 </Button>
               </DialogFooter>
             </form>

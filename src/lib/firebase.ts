@@ -2,6 +2,7 @@
 import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore"; // Import Firestore
+import { getStorage, type FirebaseStorage } from "firebase/storage"; // Import Firebase Storage
 
 // Your web app's Firebase configuration
 // IMPORTANT: Replace these with your actual Firebase project configuration
@@ -25,6 +26,8 @@ if (!getApps().length) {
 
 const auth: Auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
-const db: Firestore = getFirestore(app); // Initialize Firestore
+const db: Firestore = getFirestore(app); 
+const storage: FirebaseStorage = getStorage(app); // Initialize Firebase Storage
 
-export { app, auth, googleProvider, db }; // Export db
+export { app, auth, googleProvider, db, storage }; // Export db and storage
+
