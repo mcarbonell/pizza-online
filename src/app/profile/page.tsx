@@ -87,27 +87,48 @@ export default function ProfilePage() {
   useEffect(() => { prevOrdersRef.current = orders; }, [orders]);
 
   useEffect(() => {
-    if (!user?.uid) { setOrders([]); setIsLoadingOrders(false); initialDataLoadedRef.current = false; prevOrdersRef.current = []; return; }
-    setIsLoadingOrders(true); initialDataLoadedRef.current = false; 
+    if (!user?.uid) { 
+        setOrders([]); 
+        setIsLoadingOrders(false); 
+        initialDataLoadedRef.current = false; 
+        prevOrdersRef.current = []; 
+        return; 
+    }
+    setIsLoadingOrders(true); 
+    initialDataLoadedRef.current = false; 
+
     const ordersQuery = query( collection(db, "orders"), where("userId", "==", user.uid), orderBy("createdAt", "desc") );
     const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
       const fetchedOrders: Order[] = snapshot.docs.map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as Order));
       const currentPrevOrders = prevOrdersRef.current;
+      
       if (initialDataLoadedRef.current) {
         fetchedOrders.forEach(newOrder => {
           const oldOrder = currentPrevOrders.find(o => o.id === newOrder.id);
           if (oldOrder && oldOrder.status !== newOrder.status) {
             const newOrderUpdatedAtMs = newOrder.updatedAt?.toMillis ? newOrder.updatedAt.toMillis() : 0;
             const oldOrderUpdatedAtMs = oldOrder.updatedAt?.toMillis ? oldOrder.updatedAt.toMillis() : 0;
+            
             if (newOrderUpdatedAtMs > oldOrderUpdatedAtMs || (!newOrder.updatedAt && oldOrder.status !== newOrder.status)) {
                toast({ title: "Actualización de Pedido", description: `El estado de tu pedido #${newOrder.id?.substring(0, 8)}... es ahora: ${newOrder.status}.`, duration: 7000, });
             }
           }
         });
-      } else { initialDataLoadedRef.current = true; }
-      setOrders(fetchedOrders); setIsLoadingOrders(false);
-    }, (error) => { console.error("Error fetching orders with onSnapshot: ", error); toast({ title: "Error al Cargar Pedidos", description: "No se pudieron obtener los pedidos en tiempo real.", variant: "destructive", }); setIsLoadingOrders(false); });
-    return () => { unsubscribe(); initialDataLoadedRef.current = false; prevOrdersRef.current = []; };
+      } else { 
+        initialDataLoadedRef.current = true; 
+      }
+      setOrders(fetchedOrders); 
+      setIsLoadingOrders(false);
+    }, (error) => { 
+      console.error("Error fetching orders with onSnapshot: ", error); 
+      toast({ title: "Error al Cargar Pedidos", description: "No se pudieron obtener los pedidos en tiempo real.", variant: "destructive", }); 
+      setIsLoadingOrders(false); 
+    });
+    return () => { 
+        unsubscribe(); 
+        initialDataLoadedRef.current = false; 
+        prevOrdersRef.current = []; 
+    };
   }, [user?.uid, toast]); 
 
 
@@ -126,7 +147,7 @@ export default function ProfilePage() {
 
   const formatDate = (timestamp: any) => { if (timestamp && timestamp.toDate) { return timestamp.toDate().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } return 'Fecha no disponible'; };
 
-  const getOrderStatusBadgeClass = (status: OrderStatus) => {
+  const getOrderStatusBadgeClass = (status: OrderStatus): string => {
     switch (status) {
       case 'Pending': return 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100';
       case 'Processing': return 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-100';
@@ -170,7 +191,12 @@ export default function ProfilePage() {
                           {order.status === 'Out for Delivery' && order.deliveryLocation?.latitude && order.deliveryLocation?.longitude && (
                             <div className="my-4">
                                <h3 className="text-md font-semibold mb-2 flex items-center gap-1"><MapPin className="h-5 w-5 text-primary"/>Ubicación del Repartidor (en tiempo real):</h3>
-                               <OrderTrackingMap latitude={order.deliveryLocation.latitude} longitude={order.deliveryLocation.longitude} orderId={order.id}/>
+                               <OrderTrackingMap 
+                                  key={order.id} 
+                                  latitude={order.deliveryLocation.latitude} 
+                                  longitude={order.deliveryLocation.longitude} 
+                                  orderId={order.id}
+                                />
                             </div>
                            )}
                           <Accordion type="single" collapsible className="w-full">
