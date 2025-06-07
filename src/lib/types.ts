@@ -46,6 +46,7 @@ export interface UserProfile {
   email: string | null;
   displayName?: string | null;
   emailVerified?: boolean;
+  role?: 'admin' | 'user'; // Added role
   defaultShippingAddress?: ShippingAddressDetails | null; 
   defaultPaymentMethod?: SimulatedPaymentMethod | null;
   createdAt: any; 

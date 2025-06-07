@@ -41,6 +41,9 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
     - [x] Permitir al usuario editar/establecer su dirección de envío predeterminada desde el perfil.
     - [x] Permitir al usuario editar/establecer su método de pago simulado predeterminado desde el perfil.
 - [ ] **Panel de Administración:**
+    - [x] Definir rol 'admin' en `UserProfile` (Firestore).
+    - [x] Crear página básica `/admin` protegida por rol.
+    - [x] Añadir enlace condicional al panel de admin en el Header.
     - [ ] CRUD para productos (Pizzas, Acompañamientos, Bebidas, Postres) - podría usar Firestore.
     - [ ] Gestión de categorías de productos.
     - [ ] Visualización y gestión de pedidos recibidos.

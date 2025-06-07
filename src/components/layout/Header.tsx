@@ -5,7 +5,7 @@ import { PizzaPlaceLogo } from '@/components/icons/PizzaPlaceLogo';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { ShoppingCart, UserCircle, LogIn, LogOut, UserPlus } from 'lucide-react';
+import { ShoppingCart, UserCircle, LogIn, LogOut, UserPlus, LayoutDashboard } from 'lucide-react';
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -19,7 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Header() {
   const { getTotalItems, toggleCart } = useCart();
-  const { user, logout, isLoading } = useAuth();
+  const { user, userProfile, logout, isLoading } = useAuth(); // Added userProfile
   const totalItems = getTotalItems();
 
   const getUserInitials = (displayName?: string | null, email?: string | null) => {
@@ -73,14 +73,14 @@ export default function Header() {
                     <Avatar className="h-9 w-9">
                       {/* Placeholder for user image - can be extended later */}
                       {/* <AvatarImage src={user.photoURL || ""} alt={user.displayName || user.email || ""} /> */}
-                      <AvatarFallback>{getUserInitials(user.displayName, user.email)}</AvatarFallback>
+                      <AvatarFallback>{getUserInitials(userProfile?.displayName || user.displayName, user.email)}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user.displayName || 'Usuario'}</p>
+                      <p className="text-sm font-medium leading-none">{userProfile?.displayName || user.displayName || 'Usuario'}</p>
                       {user.email && (
                         <p className="text-xs leading-none text-muted-foreground">
                           {user.email}
@@ -95,6 +95,15 @@ export default function Header() {
                       Perfil
                     </Link>
                   </DropdownMenuItem>
+                  {userProfile?.role === 'admin' && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        Panel de Admin
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Cerrar Sesión

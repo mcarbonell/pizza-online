@@ -67,6 +67,7 @@ const createUserProfileDocument = async (firebaseUser: FirebaseUser) => {
         email,
         displayName: displayName || '',
         emailVerified,
+        role: 'user', // Default role for new users
         createdAt,
         updatedAt: createdAt,
         defaultShippingAddress: null,
@@ -93,6 +94,11 @@ const createUserProfileDocument = async (firebaseUser: FirebaseUser) => {
         updates.emailVerified = firebaseUser.emailVerified;
         needsUpdate = true;
     }
+    if (!existingData.role) { // If role doesn't exist, set to 'user'
+        updates.role = 'user';
+        needsUpdate = true;
+    }
+
 
     if (needsUpdate) {
       try {
@@ -115,7 +121,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const fetchUserProfile = useCallback(async (uid: string) => {
+  const fetchUserProfileCb = useCallback(async (uid: string) => {
     setIsLoadingUserProfile(true);
     try {
       const userRef = doc(db, "users", uid);
@@ -133,7 +139,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoadingUserProfile(false);
     }
-  }, [toast, setIsLoadingUserProfile, setUserProfile]);
+  }, [toast]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -148,7 +154,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
         };
         setUser(simpleUser);
         await createUserProfileDocument(firebaseUser); 
-        await fetchUserProfile(firebaseUser.uid); 
+        await fetchUserProfileCb(firebaseUser.uid); 
       } else {
         setUser(null);
         setUserProfile(null);
@@ -157,12 +163,13 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       setIsLoading(false); 
     });
     return () => unsubscribe();
-  }, [fetchUserProfile]);
+  }, [fetchUserProfileCb]);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const loginCb = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      // User profile will be fetched by onAuthStateChanged
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Inicio de sesión exitoso", description: "¡Bienvenido de nuevo!" });
@@ -172,9 +179,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [router, searchParams, toast, setIsLoading]);
+  }, [router, searchParams, toast]);
 
-  const signup = useCallback(async (email: string, password: string, name?: string) => {
+  const signupCb = useCallback(async (email: string, password: string, name?: string) => {
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -182,9 +189,11 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
           if (name) {
             await updateFirebaseProfile(userCredential.user, { displayName: name });
           }
+          // createUserProfileDocument will be called by onAuthStateChanged
           await sendEmailVerification(userCredential.user);
           toast({ title: "Verifica tu correo", description: "Se ha enviado un correo de verificación a tu dirección. Por favor, revisa tu bandeja de entrada." });
       }
+      // User profile will be fetched by onAuthStateChanged
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Registro exitoso", description: "¡Bienvenido a PizzaPlace!" });
@@ -194,12 +203,13 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [router, searchParams, toast, setIsLoading]);
+  }, [router, searchParams, toast]);
 
-  const loginWithGoogle = useCallback(async () => {
+  const loginWithGoogleCb = useCallback(async () => {
     setIsLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
+      // User profile will be fetched/created by onAuthStateChanged
       const redirect = searchParams.get('redirect');
       router.push(redirect || '/profile');
       toast({ title: "Inicio de sesión con Google exitoso", description: `¡Bienvenido, ${result.user.displayName || result.user.email}!` });
@@ -219,14 +229,13 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [router, searchParams, toast, setIsLoading]);
+  }, [router, searchParams, toast]);
 
-  const logout = useCallback(async () => {
+  const logoutCb = useCallback(async () => {
     setIsLoading(true);
     try {
       await signOut(auth);
-      setUser(null);
-      setUserProfile(null);
+      // setUser and setUserProfile will be set to null by onAuthStateChanged
       router.push('/');
       toast({ title: "Cierre de sesión exitoso", description: "Has cerrado sesión correctamente." });
     } catch (error: any) {
@@ -235,9 +244,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [router, toast, setIsLoading, setUser, setUserProfile]);
+  }, [router, toast]);
 
-  const resetPassword = useCallback(async (email: string) => {
+  const resetPasswordCb = useCallback(async (email: string) => {
     setIsLoading(true);
     try {
       await sendPasswordResetEmail(auth, email);
@@ -256,9 +265,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [router, toast, setIsLoading]);
+  }, [router, toast]);
 
-  const updateUserPassword = useCallback(async (currentPassword: string, newPassword: string) => {
+  const updateUserPasswordCb = useCallback(async (currentPassword: string, newPassword: string) => {
     setIsLoading(true);
     const firebaseUser = auth.currentUser;
     if (!firebaseUser || !firebaseUser.email) {
@@ -286,9 +295,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, setIsLoading]);
+  }, [toast]);
 
-  const updateUserProfileDetails = useCallback(async (data: UpdateUserProfileFormValues) => {
+  const updateUserProfileDetailsCb = useCallback(async (data: UpdateUserProfileFormValues) => {
     setIsLoading(true);
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) {
@@ -333,7 +342,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       }
 
       await updateDoc(userRef, updates);
-      await fetchUserProfile(firebaseUser.uid); 
+      await fetchUserProfileCb(firebaseUser.uid); 
 
       toast({ title: "Perfil Actualizado", description: "Tu información ha sido actualizada correctamente." });
     } catch (error: any) {
@@ -343,9 +352,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchUserProfile, toast, setIsLoading]);
+  }, [fetchUserProfileCb, toast]);
 
-  const resendVerificationEmail = useCallback(async () => {
+  const resendVerificationEmailCb = useCallback(async () => {
     setIsLoading(true);
     const firebaseUser = auth.currentUser;
     if (firebaseUser && !firebaseUser.emailVerified) {
@@ -375,26 +384,26 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
       toast({ title: "Error", description: "Usuario no encontrado.", variant: "destructive" });
       setIsLoading(false);
     }
-  }, [toast, setIsLoading]);
+  }, [toast]);
 
   const contextValue = useMemo(() => ({
     user,
     userProfile,
     isLoadingUserProfile,
     isLoading,
-    login,
-    signup,
-    logout,
-    loginWithGoogle,
-    resetPassword,
-    updateUserPassword,
-    updateUserProfileDetails,
-    resendVerificationEmail,
-    fetchUserProfile,
+    login: loginCb,
+    signup: signupCb,
+    logout: logoutCb,
+    loginWithGoogle: loginWithGoogleCb,
+    resetPassword: resetPasswordCb,
+    updateUserPassword: updateUserPasswordCb,
+    updateUserProfileDetails: updateUserProfileDetailsCb,
+    resendVerificationEmail: resendVerificationEmailCb,
+    fetchUserProfile: fetchUserProfileCb,
   }), [
     user, userProfile, isLoadingUserProfile, isLoading,
-    login, signup, logout, loginWithGoogle, resetPassword,
-    updateUserPassword, updateUserProfileDetails, resendVerificationEmail, fetchUserProfile
+    loginCb, signupCb, logoutCb, loginWithGoogleCb, resetPasswordCb,
+    updateUserPasswordCb, updateUserProfileDetailsCb, resendVerificationEmailCb, fetchUserProfileCb
   ]);
 
   return (
@@ -405,8 +414,5 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  // Removed React.Suspense wrapper as it might interact unexpectedly with context/auth flow
-  // The AuthProviderInternal itself handles loading states.
   return <AuthProviderInternal>{children}</AuthProviderInternal>;
 };
-
