@@ -1,15 +1,16 @@
 
 "use client";
 
-import { useEffect, useState, useRef } from 'react'; 
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, KeyRound, AlertTriangle, MailCheck, MailWarning, ListOrdered, UserCog, Loader2, MapPin } from 'lucide-react'; 
+import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, KeyRound, AlertTriangle, MailCheck, MailWarning, ListOrdered, UserCog, Loader2, MapPin } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
-import type { Order, UpdateUserProfileFormValues, ShippingAddressDetails, OrderStatus } from '@/lib/types'; 
+import { collection, query, where, getDocs, orderBy, onSnapshot, doc } from 'firebase/firestore';
+import type { Order, UpdateUserProfileFormValues, ShippingAddressDetails, OrderStatus } from '@/lib/types';
+import { translateOrderStatus } from '@/lib/types';
 import Image from 'next/image';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
@@ -40,7 +41,7 @@ const changePasswordSchema = z.object({
   confirmNewPassword: z.string().min(6, "Confirma tu nueva contraseña."),
 }).refine(data => data.newPassword === data.confirmNewPassword, {
   message: "Las nuevas contraseñas no coinciden.",
-  path: ["confirmNewPassword"], 
+  path: ["confirmNewPassword"],
 });
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
@@ -52,7 +53,7 @@ const updateUserProfileSchema = z.object({
   shippingCity: z.string().min(2, "La ciudad de envío es requerida.").optional().or(z.literal('')),
   shippingPostalCode: z.string().min(3, "El código postal de envío es requerido.").optional().or(z.literal('')),
   shippingPhone: z.string().optional().or(z.literal('')),
-}).refine(data => { 
+}).refine(data => {
   const shippingFields = [data.shippingName, data.shippingEmail, data.shippingAddress, data.shippingCity, data.shippingPostalCode];
   const someShippingPresent = shippingFields.some(field => field && field.length > 0);
   const allRequiredShippingPresent = data.shippingName && data.shippingEmail && data.shippingAddress && data.shippingCity && data.shippingPostalCode;
@@ -64,86 +65,84 @@ type UpdateUserProfileFormValuesZod = z.infer<typeof updateUserProfileSchema>;
 
 
 export default function ProfilePage() {
-  const { user, userProfile, logout, updateUserPassword, updateUserProfileDetails, resendVerificationEmail, isLoading: authIsLoading, isLoadingUserProfile } = useAuth(); 
+  const { user, userProfile, logout, updateUserPassword, updateUserProfileDetails, resendVerificationEmail, isLoading: authIsLoading, isLoadingUserProfile } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [isEditProfileDialogOpen, setIsEditProfileDialogOpen] = useState(false);
-  
+
   const initialDataLoadedRef = useRef(false);
-  const prevOrdersRef = useRef<Order[]>([]); 
+  const prevOrdersRef = useRef<Order[]>([]);
 
   const hasPasswordProvider = user?.providerData?.some(p => p.providerId === 'password');
 
   const passwordForm = useForm<ChangePasswordFormValues>({ resolver: zodResolver(changePasswordSchema), defaultValues: { currentPassword: "", newPassword: "", confirmNewPassword: "" }, });
-  const editProfileForm = useForm<UpdateUserProfileFormValuesZod>({ resolver: zodResolver(updateUserProfileSchema), defaultValues: { displayName: userProfile?.displayName || user?.displayName || "", shippingName: userProfile?.defaultShippingAddress?.name || "", shippingEmail: userProfile?.defaultShippingAddress?.email || "", shippingAddress: userProfile?.defaultShippingAddress?.address || "", shippingCity: userProfile?.defaultShippingAddress?.city || "", shippingPostalCode: userProfile?.defaultShippingAddress?.postalCode || "", shippingPhone: userProfile?.defaultShippingAddress?.phone || "", }, });
+  const editProfileForm = useForm<UpdateUserProfileFormValuesZod>({ resolver: zodResolver(updateUserProfileSchema), defaultValues: { displayName: userProfile?.displayName || user?.displayName || "", shippingName: userProfile?.defaultShippingAddress?.name || "", shippingEmail: userProfile?.defaultShippingAddress?.email || "", shippingAddress: userProfile?.defaultShippingAddress?.address || "", shippingCity: userProfile?.defaultShippingAddress?.city || "", shippingPostalCode: userProfile?.defaultShippingAddress?.postalCode || "", shippingPhone: userProfile.defaultShippingAddress?.phone || "", }, });
 
   useEffect(() => { if (!authIsLoading && !user) { router.push('/login?redirect=/profile'); } }, [user, authIsLoading, router]);
-  
+
   useEffect(() => { if (userProfile && isEditProfileDialogOpen && !editProfileForm.formState.isDirty) { editProfileForm.reset({ displayName: userProfile.displayName || user?.displayName || "", shippingName: userProfile.defaultShippingAddress?.name || "", shippingEmail: userProfile.defaultShippingAddress?.email || "", shippingAddress: userProfile.defaultShippingAddress?.address || "", shippingCity: userProfile.defaultShippingAddress?.city || "", shippingPostalCode: userProfile.defaultShippingAddress?.postalCode || "", shippingPhone: userProfile.defaultShippingAddress?.phone || "", }); } }, [userProfile, user, editProfileForm, isEditProfileDialogOpen]);
 
   useEffect(() => { prevOrdersRef.current = orders; }, [orders]);
 
   useEffect(() => {
-    if (!user?.uid) { 
-        setOrders([]); 
-        setIsLoadingOrders(false); 
-        initialDataLoadedRef.current = false; 
-        prevOrdersRef.current = []; 
-        return; 
+    if (!user?.uid) {
+        setOrders([]);
+        setIsLoadingOrders(false);
+        initialDataLoadedRef.current = false;
+        prevOrdersRef.current = [];
+        return;
     }
-    setIsLoadingOrders(true); 
-    initialDataLoadedRef.current = false; 
+    setIsLoadingOrders(true);
+    initialDataLoadedRef.current = false;
 
     const ordersQuery = query( collection(db, "orders"), where("userId", "==", user.uid), orderBy("createdAt", "desc") );
     const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
       const fetchedOrders: Order[] = snapshot.docs.map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as Order));
       const currentPrevOrders = prevOrdersRef.current;
-      
+
       if (initialDataLoadedRef.current) {
         fetchedOrders.forEach(newOrder => {
           const oldOrder = currentPrevOrders.find(o => o.id === newOrder.id);
           if (oldOrder && oldOrder.status !== newOrder.status) {
             const newOrderUpdatedAtMs = newOrder.updatedAt?.toMillis ? newOrder.updatedAt.toMillis() : 0;
             const oldOrderUpdatedAtMs = oldOrder.updatedAt?.toMillis ? oldOrder.updatedAt.toMillis() : 0;
-            
+
             if (newOrderUpdatedAtMs > oldOrderUpdatedAtMs || (!newOrder.updatedAt && oldOrder.status !== newOrder.status)) {
-               toast({ title: "Actualización de Pedido", description: `El estado de tu pedido #${newOrder.id?.substring(0, 8)}... es ahora: ${newOrder.status}.`, duration: 7000, });
+               toast({ title: "Actualización de Pedido", description: `El estado de tu pedido #${newOrder.id?.substring(0, 8)}... es ahora: ${translateOrderStatus(newOrder.status)}.`, duration: 7000, });
             }
           }
         });
-      } else { 
-        initialDataLoadedRef.current = true; 
+      } else {
+        initialDataLoadedRef.current = true;
       }
-      setOrders(fetchedOrders); 
+      setOrders(fetchedOrders);
       setIsLoadingOrders(false);
-    }, (error) => { 
-      console.error("Error fetching orders with onSnapshot: ", error); 
-      toast({ title: "Error al Cargar Pedidos", description: "No se pudieron obtener los pedidos en tiempo real.", variant: "destructive", }); 
-      setIsLoadingOrders(false); 
+    }, (error) => {
+      console.error("Error fetching orders with onSnapshot: ", error);
+      toast({ title: "Error al Cargar Pedidos", description: "No se pudieron obtener los pedidos en tiempo real.", variant: "destructive", });
+      setIsLoadingOrders(false);
     });
-    return () => { 
-        unsubscribe(); 
-        initialDataLoadedRef.current = false; 
-        prevOrdersRef.current = []; 
+    return () => {
+        unsubscribe();
+        initialDataLoadedRef.current = false;
+        prevOrdersRef.current = [];
     };
-  }, [user?.uid, toast]); 
+  }, [user?.uid, toast]);
 
 
   async function onSubmitPasswordChange(data: ChangePasswordFormValues) {
-    try { await updateUserPassword(data.currentPassword, data.newPassword); passwordForm.reset(); setIsPasswordDialogOpen(false); } 
+    try { await updateUserPassword(data.currentPassword, data.newPassword); passwordForm.reset(); setIsPasswordDialogOpen(false); }
     catch (error) { console.error("Failed to change password from profile page", error) }
   }
 
   async function onSubmitEditProfile(data: UpdateUserProfileFormValuesZod) {
     const mappedData: UpdateUserProfileFormValues = { displayName: data.displayName || '', shippingName: data.shippingName || '', shippingEmail: data.shippingEmail || '', shippingAddress: data.shippingAddress || '', shippingCity: data.shippingCity || '', shippingPostalCode: data.shippingPostalCode || '', shippingPhone: data.shippingPhone || '', };
-    try { await updateUserProfileDetails(mappedData); setIsEditProfileDialogOpen(false); } 
+    try { await updateUserProfileDetails(mappedData); setIsEditProfileDialogOpen(false); }
     catch (error) { console.error("Failed to update profile from profile page", error); }
   }
-
-  if (authIsLoading || isLoadingUserProfile || !user || !userProfile) { return ( <div className="flex flex-col justify-center items-center min-h-[calc(100vh-20rem)]"> <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" /> <p className="text-lg text-muted-foreground">Cargando perfil...</p> </div> ); }
 
   const formatDate = (timestamp: any) => { if (timestamp && timestamp.toDate) { return timestamp.toDate().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } return 'Fecha no disponible'; };
 
@@ -152,13 +151,14 @@ export default function ProfilePage() {
       case 'Pending': return 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100';
       case 'Processing': return 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-100';
       case 'Out for Delivery': return 'bg-teal-100 text-teal-800 border-teal-300 hover:bg-teal-100';
-      case 'Shipped': return 'bg-cyan-100 text-cyan-800 border-cyan-300 hover:bg-cyan-100';
       case 'Delivered': return 'bg-green-100 text-green-800 border-green-300 hover:bg-green-100';
       case 'Cancelled': return 'bg-red-100 text-red-800 border-red-300 hover:bg-red-100';
       case 'PaymentFailed': return 'bg-rose-100 text-rose-800 border-rose-300 hover:bg-rose-100';
       default: return 'bg-muted text-muted-foreground border-border hover:bg-muted';
     }
   };
+
+  if (authIsLoading || isLoadingUserProfile || !user || !userProfile) { return ( <div className="flex flex-col justify-center items-center min-h-[calc(100vh-20rem)]"> <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" /> <p className="text-lg text-muted-foreground">Cargando perfil...</p> </div> ); }
 
   return (
     <div className="container mx-auto py-12 px-4 max-w-4xl">
@@ -177,30 +177,30 @@ export default function ProfilePage() {
             <TabsContent value="orders">
               <section>
                 <h2 className="text-2xl font-headline mb-6 text-center text-primary flex items-center justify-center gap-2"> <ShoppingBag /> Mis Pedidos </h2>
-                {isLoadingOrders ? ( <div className="flex flex-col justify-center items-center text-center py-10"> <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" /> <p className="text-lg text-muted-foreground">Cargando tus pedidos...</p> </div> ) 
-                : orders.length === 0 ? ( <div className="text-center py-10"> <Package className="mx-auto h-16 w-16 text-muted-foreground mb-4" /> <p className="text-lg text-muted-foreground">Aún no has realizado ningún pedido.</p> <Button asChild variant="link" className="mt-4 text-primary"><Link href="/">Ir al Menú</Link></Button> </div> ) 
+                {isLoadingOrders ? ( <div className="flex flex-col justify-center items-center text-center py-10"> <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" /> <p className="text-lg text-muted-foreground">Cargando tus pedidos...</p> </div> )
+                : orders.length === 0 ? ( <div className="text-center py-10"> <Package className="mx-auto h-16 w-16 text-muted-foreground mb-4" /> <p className="text-lg text-muted-foreground">Aún no has realizado ningún pedido.</p> <Button asChild variant="link" className="mt-4 text-primary"><Link href="/">Ir al Menú</Link></Button> </div> )
                 : ( <div className="space-y-6"> {orders.map((order) => (
                       <Card key={order.id} className="shadow-lg">
                         <CardHeader>
                           <div className="flex justify-between items-start">
                             <div> <CardTitle className="font-headline text-xl md:text-2xl mb-1 flex items-center gap-2"> <Hash /> Pedido #{order.id?.substring(0, 8)}... </CardTitle> <CardDescription className="flex items-center gap-1.5 text-xs md:text-sm"> <CalendarDays className="h-4 w-4" /> {formatDate(order.createdAt)} </CardDescription> </div>
-                            <Badge variant="outline" className={getOrderStatusBadgeClass(order.status)}>{order.status}</Badge>
+                            <Badge variant="outline" className={getOrderStatusBadgeClass(order.status)}>{translateOrderStatus(order.status)}</Badge>
                           </div>
                         </CardHeader>
                         <CardContent>
-                          
+
                           {order.status === 'Out for Delivery' && order.deliveryLocation?.latitude && order.deliveryLocation?.longitude && (
                             <div className="my-4">
                                <h3 className="text-md font-semibold mb-2 flex items-center gap-1"><MapPin className="h-5 w-5 text-primary"/>Ubicación del Repartidor (en tiempo real):</h3>
-                               <OrderTrackingMap 
-                                  key={`tracking-${order.id}`} // Unique key for each map instance
-                                  latitude={order.deliveryLocation.latitude} 
-                                  longitude={order.deliveryLocation.longitude} 
-                                  orderId={order.id!} // Pass order.id for internal cleanup context
+                               <OrderTrackingMap
+                                  key={`map-tracking-${order.id}`}
+                                  orderId={order.id!}
+                                  latitude={order.deliveryLocation.latitude}
+                                  longitude={order.deliveryLocation.longitude}
                                 />
                             </div>
                            )}
-                           
+
                           <Accordion type="single" collapsible className="w-full">
                             <AccordionItem value="items"> <AccordionTrigger className="text-base font-semibold">Ver {order.items.length} Artículo(s)</AccordionTrigger>
                               <AccordionContent> <ul className="space-y-3 pt-2"> {order.items.map((item) => ( <li key={item.id} className="flex items-center justify-between gap-3 p-2 rounded-md bg-muted/20"> <div className="flex items-center gap-3"> <Image src={item.imageUrl} alt={item.name} width={40} height={40} className="rounded object-cover" data-ai-hint={item.dataAiHint}/> <div><p className="font-semibold text-sm">{item.name}</p><p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p></div> </div> <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p> </li> ))} </ul> </AccordionContent>
@@ -234,9 +234,8 @@ export default function ProfilePage() {
             </TabsContent>
           </Tabs>
         </CardContent>
-        <CardFooter className="border-t pt-6"> <Button onClick={logout} variant="destructive" className="w-full" disabled={authIsLoading}> <LogOut /> {authIsLoading ? 'Cerrando sesión...' : 'Cerrar Sesión'} </Button> </CardFooter>
+        <CardFooter className="border-t pt-6"> <Button onClick={logout} variant="destructive" className="w-full" disabled={authIsLoading}> <LogOut /> {authIsLoading ? 'Cerrando sesión...' : 'Cerrar Sesión'} </Button> </Footer>
       </Card>
     </div>
   );
 }
-

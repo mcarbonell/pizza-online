@@ -56,7 +56,19 @@ export interface UserProfile {
   updatedAt: any; 
 }
 
-export type OrderStatus = 'Pending' | 'Processing' | 'Out for Delivery' | 'Shipped' | 'Delivered' | 'Cancelled' | 'PaymentFailed';
+export type OrderStatus = 'Pending' | 'Processing' | 'Out for Delivery' | 'Delivered' | 'Cancelled' | 'PaymentFailed';
+
+export const translateOrderStatus = (status: OrderStatus): string => {
+  switch (status) {
+    case 'Pending': return 'Pendiente';
+    case 'Processing': return 'Procesando';
+    case 'Out for Delivery': return 'En Reparto';
+    case 'Delivered': return 'Entregado';
+    case 'Cancelled': return 'Cancelado';
+    case 'PaymentFailed': return 'Pago Fallido';
+    default: return status;
+  }
+};
 
 export interface Order {
   id?: string; 
@@ -84,10 +96,3 @@ export interface UpdateUserProfileFormValues {
   shippingPostalCode: string;
   shippingPhone?: string;
 }
-
-// This type was used for defaultPaymentMethod in UserProfile which is currently not actively used.
-// If defaultPaymentMethod is re-introduced, this type can be used.
-// export interface SimulatedPaymentMethod {
-//   last4Digits: string;
-//   expiryDate: string; // e.g., "MM/YY"
-// }

@@ -6,10 +6,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus, ClipboardList, RefreshCcw, Users, UserCheck, UserCog, MapPin, PlayCircle, StopCircle } from 'lucide-react';
+import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus, ClipboardList, RefreshCcw, Users, UserCheck, UserCog, MapPin } from 'lucide-react';
 import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, query, orderBy, writeBatch, doc, updateDoc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import type { Product, Order, UserProfile, ProductCategory, OrderStatus } from '@/lib/types';
+import { translateOrderStatus } from '@/lib/types'; // Import the translation function
 import { initialProductData } from '@/data/products';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from "react-hook-form";
@@ -58,7 +59,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const productCategories: ProductCategory[] = ['Pizzas', 'Sides', 'Drinks', 'Desserts'];
-const orderStatuses: OrderStatus[] = ['Pending', 'Processing', 'Out for Delivery', 'Shipped', 'Delivered', 'Cancelled', 'PaymentFailed'];
+const orderStatuses: OrderStatus[] = ['Pending', 'Processing', 'Out for Delivery', 'Delivered', 'Cancelled', 'PaymentFailed'];
 const userRoles = ['user', 'admin'] as const;
 const DEFAULT_PLACEHOLDER_IMAGE = 'https://placehold.co/600x400.png';
 
@@ -174,7 +175,6 @@ export default function AdminPage() {
     } else { editForm.reset(editForm.formState.defaultValues); }
   }, [editingProduct, editForm]);
   
-  // Cleanup geolocation watches on component unmount
   useEffect(() => {
     return () => {
       Object.values(activeWatchIdsRef.current).forEach(watchId => {
@@ -269,7 +269,7 @@ export default function AdminPage() {
       toast({ title: "Error GPS", description: "Geolocalización no soportada por este navegador.", variant: "destructive" });
       return;
     }
-    if (activeWatchIdsRef.current[orderId]) { // Already tracking this order
+    if (activeWatchIdsRef.current[orderId]) { 
       return;
     }
 
@@ -279,7 +279,7 @@ export default function AdminPage() {
         try {
           await updateDoc(doc(db, 'orders', orderId), {
             deliveryLocation: { latitude, longitude, timestamp: serverTimestamp() },
-            updatedAt: serverTimestamp(), // Also update order's general updatedAt
+            updatedAt: serverTimestamp(), 
           });
           console.log(`Location sent for order ${orderId}: ${latitude}, ${longitude}`);
         } catch (error) {
@@ -294,7 +294,7 @@ export default function AdminPage() {
         else if (error.code === error.POSITION_UNAVAILABLE) message = "Información de ubicación no disponible.";
         else if (error.code === error.TIMEOUT) message = "Timeout al obtener la ubicación.";
         toast({ title: "Error GPS", description: message, variant: "destructive" });
-        stopDeliveryTracking(orderId); // Stop if there's an error
+        stopDeliveryTracking(orderId); 
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -306,12 +306,12 @@ export default function AdminPage() {
     const watchId = activeWatchIdsRef.current[orderId];
     if (watchId) {
       navigator.geolocation.clearWatch(watchId);
-      const {[orderId]: _, ...rest} = activeWatchIdsRef.current; // Remove from active watches
+      const {[orderId]: _, ...rest} = activeWatchIdsRef.current; 
       activeWatchIdsRef.current = rest;
     }
     try {
       await updateDoc(doc(db, 'orders', orderId), {
-        deliveryLocation: null, // Clear location
+        deliveryLocation: null, 
         updatedAt: serverTimestamp(),
       });
       toast({ title: "Seguimiento Detenido", description: `Seguimiento para pedido #${orderId.substring(0,6)}... finalizado.` });
@@ -327,12 +327,12 @@ export default function AdminPage() {
 
     try {
       await updateDoc(doc(db, 'orders', orderId), { status: newStatus, updatedAt: serverTimestamp() });
-      toast({ title: "Estado del Pedido Actualizado", description: `El pedido #${orderId.substring(0,6)}... ahora está ${newStatus}.` });
+      toast({ title: "Estado del Pedido Actualizado", description: `El pedido #${orderId.substring(0,6)}... ahora está ${translateOrderStatus(newStatus)}.` });
       
       if (newStatus === 'Out for Delivery') {
         startDeliveryTracking(orderId);
       } else if (oldStatus === 'Out for Delivery' && newStatus !== 'Out for Delivery') {
-        await stopDeliveryTracking(orderId); // await to ensure location is cleared before fetching
+        await stopDeliveryTracking(orderId); 
       }
       
       fetchOrders(); 
@@ -422,7 +422,7 @@ export default function AdminPage() {
                       <TableBody>{orders.map((order) => (<TableRow key={order.id}><TableCell className="font-mono text-xs">{order.id?.substring(0,8)}...</TableCell><TableCell>{formatDate(order.createdAt)}</TableCell><TableCell>{order.shippingAddress.email}</TableCell><TableCell className="text-right">€{order.totalAmount.toFixed(2)}</TableCell><TableCell className="text-center">
                         <Select value={order.status} onValueChange={(newStatus) => handleUpdateOrderStatus(order.id!, newStatus as OrderStatus)} disabled={isAnyActionInProgress}>
                             <SelectTrigger className="w-[150px] h-9 text-xs"><SelectValue placeholder="Cambiar estado" /></SelectTrigger>
-                            <SelectContent>{orderStatuses.map(status => (<SelectItem key={status} value={status} className="text-xs">{status}</SelectItem>))}</SelectContent>
+                            <SelectContent>{orderStatuses.map(status => (<SelectItem key={status} value={status} className="text-xs">{translateOrderStatus(status)}</SelectItem>))}</SelectContent>
                         </Select>
                       </TableCell>
                       <TableCell className="text-center">
