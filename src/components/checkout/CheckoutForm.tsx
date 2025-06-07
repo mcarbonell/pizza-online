@@ -20,11 +20,10 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreditCard, User as UserIcon, Save } from 'lucide-react';
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
-import type { ShippingAddressDetails, PaymentDetails, Order, SimulatedPaymentMethod } from "@/lib/types";
+import { User as UserIcon, Loader2 } from 'lucide-react'; // Added Loader2
+import type { ShippingAddressDetails } from "@/lib/types";
 import { useEffect, useState } from "react";
+import { getStripe } from "@/lib/stripe"; // Import Stripe loader
 
 const addressSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -35,30 +34,20 @@ const addressSchema = z.object({
   postalCode: z.string().min(3, { message: "Postal code is too short." }),
 });
 
-const paymentSchema = z.object({
-  cardNumber: z.string()
-    .min(13, { message: "Card number must be between 13 and 19 digits." })
-    .max(19, { message: "Card number must be between 13 and 19 digits." })
-    .regex(/^\d+$/, { message: "Card number must contain only digits." }),
-  expiryDate: z.string()
-    .regex(/^(0[1-9]|1[0-2])\/\d{2}$/, { message: "Expiry date must be in MM/YY format." }),
-  cvv: z.string().min(3, { message: "CVV must be 3 or 4 digits." }).max(4, { message: "CVV must be 3 or 4 digits." })
-    .regex(/^\d+$/, { message: "CVV must contain only digits." }),
-});
-
-const checkoutFormSchema = addressSchema.merge(paymentSchema).extend({
+const checkoutFormSchema = addressSchema.extend({
   saveAddress: z.boolean().default(true).optional(),
-  savePaymentMethod: z.boolean().default(true).optional(), // Added
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutFormSchema>;
 
 export default function CheckoutForm() {
   const { user, userProfile, fetchUserProfile, isLoading: authLoading, isLoadingUserProfile } = useAuth();
-  const { cartItems, getCartTotal, clearCart } = useCart();
+  const { cartItems, getCartTotal } = useCart(); // Removed clearCart for now, will be handled by webhook
   const { toast } = useToast();
   const router = useRouter();
   const [isFormPreFilled, setIsFormPreFilled] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema),
@@ -69,11 +58,7 @@ export default function CheckoutForm() {
       address: "",
       city: "",
       postalCode: "",
-      cardNumber: "",
-      expiryDate: "",
-      cvv: "",
       saveAddress: true,
-      savePaymentMethod: true, // Added
     },
   });
 
@@ -86,15 +71,7 @@ export default function CheckoutForm() {
         address: userProfile.defaultShippingAddress?.address || '',
         city: userProfile.defaultShippingAddress?.city || '',
         postalCode: userProfile.defaultShippingAddress?.postalCode || '',
-        saveAddress: !!userProfile.defaultShippingAddress, // Check if address exists
-        
-        // Pre-fill payment if available
-        cardNumber: userProfile.defaultPaymentMethod?.last4Digits 
-          ? `•••• •••• •••• ${userProfile.defaultPaymentMethod.last4Digits}` 
-          : '',
-        expiryDate: userProfile.defaultPaymentMethod?.expiryDate || '',
-        cvv: '', // CVV is never pre-filled or stored
-        savePaymentMethod: !!userProfile.defaultPaymentMethod, // Check if payment method exists
+        saveAddress: !!userProfile.defaultShippingAddress, 
       };
       form.reset(defaultVals);
       setIsFormPreFilled(true);
@@ -113,12 +90,16 @@ export default function CheckoutForm() {
       return;
     }
 
-    // If card number is masked, use the original full number if it was being edited, or prompt user.
-    // For this simulation, we'll assume if it's masked, they are using the "stored" card and don't re-type it.
-    // A real implementation would require more complex logic or reliance on a payment gateway's token.
-    const actualCardNumber = (data.cardNumber.startsWith("••••") && userProfile?.defaultPaymentMethod)
-      ? `SIMULATED_CARD_ENDING_IN_${userProfile.defaultPaymentMethod.last4Digits}` // This won't be the actual number, just for Firestore
-      : data.cardNumber;
+    if (cartItems.length === 0) {
+      toast({
+        title: "Error",
+        description: "Your cart is empty.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsProcessingPayment(true);
 
     const shippingAddressPayload: ShippingAddressDetails = {
       name: data.name,
@@ -129,75 +110,84 @@ export default function CheckoutForm() {
       postalCode: data.postalCode,
     };
 
-    const paymentDetailsPayload: PaymentDetails = {
-      cardNumber: actualCardNumber, // Use actualCardNumber for the order record
-      expiryDate: data.expiryDate,
-      cvv: data.cvv,
-    };
-
-    const orderData: Omit<Order, 'id'> = {
-      userId: user.uid,
-      items: cartItems,
-      totalAmount: getCartTotal(),
-      shippingAddress: shippingAddressPayload,
-      paymentDetails: paymentDetailsPayload,
-      createdAt: serverTimestamp(),
-      status: 'Pending',
-    };
-
     try {
-      const userRef = doc(db, "users", user.uid);
-      const updatesToUserProfile: Partial<typeof userProfile> = { updatedAt: serverTimestamp() };
-
-      if (data.saveAddress) {
-        updatesToUserProfile.defaultShippingAddress = shippingAddressPayload;
+      // 1. Save address preference if selected (optional, can be done via webhook too)
+      if (data.saveAddress && userProfile) {
+         if (JSON.stringify(userProfile.defaultShippingAddress) !== JSON.stringify(shippingAddressPayload)) {
+            // Only update if it's different or new
+            // This is a simplified update, a more robust one would be in AuthContext
+            const { updateUserProfileDetails } = useAuth(); // Assuming this is okay to call here
+            await updateUserProfileDetails({
+                displayName: userProfile.displayName || '',
+                shippingName: shippingAddressPayload.name,
+                shippingEmail: shippingAddressPayload.email,
+                shippingAddress: shippingAddressPayload.address,
+                shippingCity: shippingAddressPayload.city,
+                shippingPostalCode: shippingAddressPayload.postalCode,
+                shippingPhone: shippingAddressPayload.phone,
+                // payment fields are removed
+            });
+            await fetchUserProfile(user.uid);
+            toast({
+                title: "Dirección Guardada",
+                description: "Tu dirección de envío ha sido guardada para futuros pedidos.",
+            });
+         }
       }
 
-      if (data.savePaymentMethod) {
-        const last4 = data.cardNumber.slice(-4);
-        const simulatedPayment: SimulatedPaymentMethod = {
-          last4Digits: last4,
-          expiryDate: data.expiryDate,
-        };
-        updatesToUserProfile.defaultPaymentMethod = simulatedPayment;
-      }
-      
-      if (Object.keys(updatesToUserProfile).length > 1) { // more than just updatedAt
-          await updateDoc(userRef, updatesToUserProfile);
-          await fetchUserProfile(user.uid); 
-          toast({
-            title: "Información Guardada",
-            description: "Tu información de envío y/o pago (simulada) ha sido guardada.",
-            variant: "default",
-          });
-      }
-      
-      const docRef = await addDoc(collection(db, "orders"), orderData);
-      console.log("Order submitted to Firestore with ID: ", docRef.id);
-
-      toast({
-        title: "Order Placed Successfully!",
-        description: "Thank you for your order. We'll start preparing it right away!",
-        variant: "default",
+      // 2. Create Stripe Checkout Session
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+            items: cartItems, 
+            userId: user.uid, 
+            shippingAddress: shippingAddressPayload 
+        }),
       });
-      clearCart();
-      router.push('/');
-    } catch (error) {
-      console.error("Error placing order: ", error);
+
+      const sessionData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(sessionData.error || 'Failed to create Stripe session.');
+      }
+
+      // 3. Redirect to Stripe Checkout
+      const stripe = await getStripe();
+      if (!stripe) {
+        throw new Error('Stripe.js has not loaded yet.');
+      }
+
+      const { error } = await stripe.redirectToCheckout({
+        sessionId: sessionData.sessionId,
+      });
+
+      if (error) {
+        console.error('Stripe redirect error:', error);
+        toast({
+          title: "Error de Redirección a Stripe",
+          description: error.message || "No se pudo redirigir a la página de pago.",
+          variant: "destructive",
+        });
+      }
+      // If redirectToCheckout is successful, the user is navigated away,
+      // so no further client-side processing for order creation happens here.
+      // Order creation will be handled by the webhook.
+
+    } catch (error: any) {
+      console.error("Error processing payment: ", error);
       toast({
-        title: "Error Placing Order",
-        description: "There was a problem submitting your order. Please try again.",
+        title: "Error al Procesar el Pago",
+        description: error.message || "Hubo un problema. Por favor, inténtalo de nuevo.",
         variant: "destructive",
       });
+    } finally {
+        setIsProcessingPayment(false);
     }
   }
   
-  // Handle card number input: if it's pre-filled and user starts typing, clear the mask.
-  const handleCardNumberFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    if (e.target.value.startsWith("••••")) {
-      form.setValue("cardNumber", "");
-    }
-  };
 
   return (
     <Form {...form}>
@@ -308,81 +298,21 @@ export default function CheckoutForm() {
             />
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline text-2xl flex items-center gap-2"><CreditCard /> Payment Details (Simulated)</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-          <FormField
-            control={form.control}
-            name="cardNumber"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Card Number</FormLabel>
-                <FormControl>
-                  <Input 
-                    placeholder="•••• •••• •••• ••••" 
-                    {...field} 
-                    onFocus={handleCardNumberFocus}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="expiryDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Expiry Date (MM/YY)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="MM/YY" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="cvv"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>CVV</FormLabel>
-                  <FormControl>
-                    <Input placeholder="•••" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-           <FormField
-              control={form.control}
-              name="savePaymentMethod"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm mt-6">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel className="cursor-pointer">
-                      Guardar esta tarjeta para futuros pedidos (simulado)
-                    </FormLabel>
-                  </div>
-                </FormItem>
-              )}
-            />
-          </CardContent>
-        </Card>
         
-        <Button type="submit" size="lg" className="w-full bg-primary hover:bg-primary/90 text-lg py-3" disabled={form.formState.isSubmitting || authLoading || !user}>
-          {form.formState.isSubmitting ? 'Procesando...' : 'Pagar y Realizar Pedido'}
+        <Button 
+          type="submit" 
+          size="lg" 
+          className="w-full bg-primary hover:bg-primary/90 text-lg py-3" 
+          disabled={isProcessingPayment || authLoading || !user || cartItems.length === 0}
+        >
+          {isProcessingPayment ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Procesando...
+            </>
+          ) : (
+            'Proceder al Pago con Stripe'
+          )}
         </Button>
       </form>
     </Form>

@@ -40,8 +40,8 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
 - [x] **Edición de Perfil de Usuario:**
     - [x] Permitir al usuario editar su nombre (`displayName`) desde el perfil.
     - [x] Permitir al usuario editar/establecer su dirección de envío predeterminada desde el perfil.
-    - [x] Permitir al usuario editar/establecer su método de pago simulado predeterminado desde el perfil.
-- [ ] **Panel de Administración:**
+    - [x] Permitir al usuario editar/establecer su método de pago simulado predeterminado desde el perfil. (Eliminado con integración de Stripe)
+- [x] **Panel de Administración:**
     - [x] Definir rol 'admin' en `UserProfile` (Firestore).
     - [x] Crear página básica `/admin` protegida por rol.
     - [x] Añadir enlace condicional al panel de admin en el Header.
@@ -51,12 +51,20 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
         - [x] Añadir nuevos productos con subida de imagen a Firebase Storage.
         - [x] Editar productos existentes con subida/actualización de imagen a Firebase Storage.
         - [x] Eliminar productos (con eliminación de imagen asociada de Firebase Storage).
+    - [x] Visualización y gestión de pedidos recibidos (cambio de estado).
+    - [x] Gestión de usuarios (roles básicos).
     - [ ] Gestión de categorías de productos.
-    - [ ] Visualización y gestión de pedidos recibidos (cambio de estado).
-    - [ ] Gestión de usuarios (roles básicos).
-- [ ] **Integración de Pasarela de Pago Real:**
-    - [ ] Integración con Stripe o PayPal.
-    - [ ] Manejo seguro de transacciones.
+- [ ] **Integración de Pasarela de Pago Real (Stripe):**
+    - [x] Configurar cuenta de Stripe y obtener claves API (modo prueba).
+    - [x] Añadir paquetes `stripe` y `@stripe/stripe-js`.
+    - [x] Crear API route `/api/stripe/create-checkout-session`.
+    - [x] Modificar `CheckoutForm.tsx` para redirigir a Stripe.
+    - [x] Crear páginas de éxito (`/checkout/success`) y cancelación (`/checkout/cancel`).
+    - [ ] **Implementar Webhook de Stripe (`/api/stripe/webhook`):**
+        - [ ] Manejar evento `checkout.session.completed` para crear el pedido en Firestore.
+        - [ ] Manejar otros eventos relevantes (ej. `payment_intent.succeeded`, `payment_intent.payment_failed`).
+        - [ ] Asegurar y verificar firmas de webhook.
+    - [ ] Configurar Stripe CLI para pruebas locales de webhooks.
 - [ ] **Seguimiento de Pedidos en Tiempo Real (simulado o básico con Firestore):**
     - [ ] Actualización del estado del pedido (ej. Preparando, En camino, Entregado).
 - [ ] **Internacionalización (i18n):**

@@ -26,16 +26,14 @@ export interface ShippingAddressDetails {
   phone?: string;
 }
 
-export interface SimulatedPaymentMethod {
-  last4Digits: string;
-  expiryDate: string; // MM/YY
+// This interface is updated to reflect what might be stored after a Stripe payment
+// The actual card details are NOT stored by us.
+export interface PaymentDetails {
+  stripePaymentIntentId: string | null; // Store the Stripe Payment Intent ID
+  // last4Digits?: string; // Could be retrieved from Stripe if needed
+  // cardBrand?: string; // Could be retrieved from Stripe if needed
 }
 
-export interface PaymentDetails {
-  cardNumber: string; 
-  expiryDate: string; 
-  cvv: string;
-}
 
 export interface User {
   uid: string;        
@@ -52,7 +50,7 @@ export interface UserProfile {
   emailVerified?: boolean;
   role?: 'admin' | 'user'; 
   defaultShippingAddress?: ShippingAddressDetails | null; 
-  defaultPaymentMethod?: SimulatedPaymentMethod | null;
+  // defaultPaymentMethod is removed, Stripe handles saved payment methods.
   createdAt: any; 
   updatedAt: any; 
 }
@@ -63,12 +61,12 @@ export interface Order {
   items: CartItem[];
   totalAmount: number;
   shippingAddress: ShippingAddressDetails; 
-  paymentDetails: PaymentDetails; 
+  paymentDetails: PaymentDetails; // Updated to use the new PaymentDetails
   createdAt: any; 
-  status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
+  status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'PaymentFailed'; // Added PaymentFailed
 }
 
-// Schema for the edit profile form
+// Schema for the edit profile form - payment fields removed
 export interface UpdateUserProfileFormValues {
   displayName: string;
   shippingName: string;
@@ -77,7 +75,5 @@ export interface UpdateUserProfileFormValues {
   shippingCity: string;
   shippingPostalCode: string;
   shippingPhone?: string;
-  paymentLast4Digits: string;
-  paymentExpiryDate: string;
+  // paymentLast4Digits and paymentExpiryDate are removed
 }
-

@@ -6,10 +6,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, CreditCardIcon, KeyRound, AlertTriangle, MailCheck, MailWarning, ListOrdered, UserCog } from 'lucide-react';
+import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, KeyRound, AlertTriangle, MailCheck, MailWarning, ListOrdered, UserCog } from 'lucide-react'; // Removed CreditCardIcon
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import type { Order, UpdateUserProfileFormValues, ShippingAddressDetails, SimulatedPaymentMethod } from '@/lib/types'; 
+import type { Order, UpdateUserProfileFormValues, ShippingAddressDetails } from '@/lib/types'; 
 import Image from 'next/image';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,7 @@ const changePasswordSchema = z.object({
 });
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
+// Update Zod schema to remove payment fields
 const updateUserProfileSchema = z.object({
   displayName: z.string().min(2, "El nombre debe tener al menos 2 caracteres.").max(50, "El nombre no puede exceder los 50 caracteres."),
   
@@ -46,35 +47,21 @@ const updateUserProfileSchema = z.object({
   shippingPostalCode: z.string().min(3, "El código postal de envío es requerido.").optional().or(z.literal('')),
   shippingPhone: z.string().optional().or(z.literal('')),
 
-  paymentLast4Digits: z.string()
-    .length(4, "Los últimos 4 dígitos deben ser 4 números.")
-    .regex(/^\d{4}$/, "Debe contener solo 4 números.")
-    .optional().or(z.literal('')),
-  paymentExpiryDate: z.string()
-    .regex(/^(0[1-9]|1[0-2])\/\d{2}$/, "La fecha de caducidad debe ser MM/AA.")
-    .optional().or(z.literal('')),
+  // paymentLast4Digits and paymentExpiryDate are removed
 }).refine(data => { 
   const shippingFields = [data.shippingName, data.shippingEmail, data.shippingAddress, data.shippingCity, data.shippingPostalCode];
-  const paymentFields = [data.paymentLast4Digits, data.paymentExpiryDate];
-
+  
   const someShippingPresent = shippingFields.some(field => field && field.length > 0);
   const allRequiredShippingPresent = data.shippingName && data.shippingEmail && data.shippingAddress && data.shippingCity && data.shippingPostalCode;
-
-  const somePaymentPresent = paymentFields.some(field => field && field.length > 0);
-  const allRequiredPaymentPresent = data.paymentLast4Digits && data.paymentExpiryDate;
   
   if (someShippingPresent && (!allRequiredShippingPresent && (
         !data.shippingName || !data.shippingEmail || !data.shippingAddress || !data.shippingCity || !data.shippingPostalCode
     ))) {
         return false;
     }
-  if (somePaymentPresent && (!allRequiredPaymentPresent && (!data.paymentLast4Digits || !data.paymentExpiryDate))) {
-     return false;
-  }
-  
   return true;
 }, {
-  message: "Si se proporciona un detalle de envío o pago, todos sus campos principales son requeridos (excepto teléfono de envío).",
+  message: "Si se proporciona un detalle de envío, todos sus campos principales son requeridos (excepto teléfono).",
   path: ["shippingName"], 
 });
 
@@ -108,7 +95,7 @@ export default function ProfilePage() {
 
   const editProfileForm = useForm<UpdateUserProfileFormValuesZod>({
     resolver: zodResolver(updateUserProfileSchema),
-    defaultValues: {
+    defaultValues: { // Default values updated
       displayName: userProfile?.displayName || user?.displayName || "",
       shippingName: userProfile?.defaultShippingAddress?.name || "",
       shippingEmail: userProfile?.defaultShippingAddress?.email || "",
@@ -116,8 +103,6 @@ export default function ProfilePage() {
       shippingCity: userProfile?.defaultShippingAddress?.city || "",
       shippingPostalCode: userProfile?.defaultShippingAddress?.postalCode || "",
       shippingPhone: userProfile?.defaultShippingAddress?.phone || "",
-      paymentLast4Digits: userProfile?.defaultPaymentMethod?.last4Digits || "",
-      paymentExpiryDate: userProfile?.defaultPaymentMethod?.expiryDate || "",
     },
   });
 
@@ -129,7 +114,7 @@ export default function ProfilePage() {
   
   useEffect(() => {
     if (userProfile && isEditProfileDialogOpen && !editProfileForm.formState.isDirty) {
-      editProfileForm.reset({
+      editProfileForm.reset({ // Reset updated
         displayName: userProfile.displayName || user?.displayName || "",
         shippingName: userProfile.defaultShippingAddress?.name || "",
         shippingEmail: userProfile.defaultShippingAddress?.email || "",
@@ -137,8 +122,6 @@ export default function ProfilePage() {
         shippingCity: userProfile.defaultShippingAddress?.city || "",
         shippingPostalCode: userProfile.defaultShippingAddress?.postalCode || "",
         shippingPhone: userProfile.defaultShippingAddress?.phone || "",
-        paymentLast4Digits: userProfile.defaultPaymentMethod?.last4Digits || "",
-        paymentExpiryDate: userProfile.defaultPaymentMethod?.expiryDate || "",
       });
     }
   }, [userProfile, user, editProfileForm, isEditProfileDialogOpen]);
@@ -178,6 +161,7 @@ export default function ProfilePage() {
   }
 
   async function onSubmitEditProfile(data: UpdateUserProfileFormValuesZod) {
+    // Map data, removing payment fields explicitly for clarity if needed
     const mappedData: UpdateUserProfileFormValues = {
       displayName: data.displayName || '',
       shippingName: data.shippingName || '',
@@ -186,8 +170,6 @@ export default function ProfilePage() {
       shippingCity: data.shippingCity || '',
       shippingPostalCode: data.shippingPostalCode || '',
       shippingPhone: data.shippingPhone || '',
-      paymentLast4Digits: data.paymentLast4Digits || '',
-      paymentExpiryDate: data.paymentExpiryDate || '',
     };
     try {
       await updateUserProfileDetails(mappedData);
@@ -285,32 +267,21 @@ export default function ProfilePage() {
                     </CardContent>
                   </Card>
                 )}
-                {userProfile?.defaultPaymentMethod && userProfile.defaultPaymentMethod.last4Digits && (
-                  <Card className="mt-4">
-                    <CardHeader>
-                      <CardTitle className="text-lg font-headline flex items-center gap-2"><CreditCardIcon className="h-5 w-5"/> Método de Pago Predeterminado (Simulado)</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm space-y-1">
-                      <p><strong>Tarjeta terminada en:</strong> •••• {userProfile.defaultPaymentMethod.last4Digits}</p>
-                      <p><strong>Fecha de caducidad:</strong> {userProfile.defaultPaymentMethod.expiryDate}</p>
-                      <p className="text-xs text-muted-foreground">(Solo se almacenan los últimos 4 dígitos y la fecha de caducidad. CVV nunca se guarda.)</p>
-                    </CardContent>
-                  </Card>
-                )}
+                {/* Payment method section removed */}
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
                 <Dialog open={isEditProfileDialogOpen} onOpenChange={setIsEditProfileDialogOpen}>
                     <DialogTrigger asChild>
                         <Button variant="outline" className="w-full">
-                            <Edit3 /> Editar Perfil y Preferencias
+                            <Edit3 /> Editar Perfil y Dirección
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-lg max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="flex items-center gap-2"><Edit3/> Editar Perfil</DialogTitle>
                             <DialogDescription>
-                                Actualiza tu nombre, dirección de envío predeterminada y método de pago simulado.
+                                Actualiza tu nombre y dirección de envío predeterminada.
                             </DialogDescription>
                         </DialogHeader>
                         <ScrollArea className="max-h-[60vh] p-1 pr-5">
@@ -327,7 +298,7 @@ export default function ProfilePage() {
                                         </FormItem>
                                     )}
                                 />
-                                <Accordion type="multiple" className="w-full" defaultValue={['shipping', 'payment']}>
+                                <Accordion type="single" collapsible className="w-full" defaultValue="shipping">
                                     <AccordionItem value="shipping">
                                         <AccordionTrigger className="text-lg font-semibold">Dirección de Envío Predeterminada</AccordionTrigger>
                                         <AccordionContent className="space-y-4 pt-4">
@@ -341,13 +312,7 @@ export default function ProfilePage() {
                                             <FormField control={editProfileForm.control} name="shippingPhone" render={({ field }) => ( <FormItem> <FormLabel>Teléfono (Opcional)</FormLabel> <FormControl><Input placeholder="Número de teléfono" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                                         </AccordionContent>
                                     </AccordionItem>
-                                    <AccordionItem value="payment">
-                                        <AccordionTrigger className="text-lg font-semibold">Pago Predeterminado (Simulado)</AccordionTrigger>
-                                        <AccordionContent className="space-y-4 pt-4">
-                                            <FormField control={editProfileForm.control} name="paymentLast4Digits" render={({ field }) => ( <FormItem> <FormLabel>Últimos 4 dígitos de la tarjeta</FormLabel> <FormControl><Input placeholder="1234" {...field} maxLength={4} /></FormControl> <FormMessage /> </FormItem> )}/>
-                                            <FormField control={editProfileForm.control} name="paymentExpiryDate" render={({ field }) => ( <FormItem> <FormLabel>Fecha de caducidad (MM/AA)</FormLabel> <FormControl><Input placeholder="MM/AA" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                                        </AccordionContent>
-                                    </AccordionItem>
+                                   {/* Payment AccordionItem removed */}
                                 </Accordion>
                                 <DialogFooter className="mt-6">
                                     <DialogClose asChild><Button type="button" variant="ghost">Cancelar</Button></DialogClose>
