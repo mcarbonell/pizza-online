@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react'; // Added useRef
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, KeyRound, AlertTriangle, MailCheck, MailWarning, ListOrdered, UserCog } from 'lucide-react'; // Removed CreditCardIcon
+import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, KeyRound, AlertTriangle, MailCheck, MailWarning, ListOrdered, UserCog } from 'lucide-react'; 
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore'; // Added onSnapshot
 import type { Order, UpdateUserProfileFormValues, ShippingAddressDetails } from '@/lib/types'; 
 import Image from 'next/image';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -36,7 +36,6 @@ const changePasswordSchema = z.object({
 });
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
-// Update Zod schema to remove payment fields
 const updateUserProfileSchema = z.object({
   displayName: z.string().min(2, "El nombre debe tener al menos 2 caracteres.").max(50, "El nombre no puede exceder los 50 caracteres."),
   
@@ -46,8 +45,6 @@ const updateUserProfileSchema = z.object({
   shippingCity: z.string().min(2, "La ciudad de envío es requerida.").optional().or(z.literal('')),
   shippingPostalCode: z.string().min(3, "El código postal de envío es requerido.").optional().or(z.literal('')),
   shippingPhone: z.string().optional().or(z.literal('')),
-
-  // paymentLast4Digits and paymentExpiryDate are removed
 }).refine(data => { 
   const shippingFields = [data.shippingName, data.shippingEmail, data.shippingAddress, data.shippingCity, data.shippingPostalCode];
   
@@ -85,6 +82,7 @@ export default function ProfilePage() {
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [isEditProfileDialogOpen, setIsEditProfileDialogOpen] = useState(false);
+  const initialDataLoadedRef = useRef(false); // Used to track initial data load for orders
 
   const hasPasswordProvider = user?.providerData?.some(p => p.providerId === 'password');
 
@@ -95,7 +93,7 @@ export default function ProfilePage() {
 
   const editProfileForm = useForm<UpdateUserProfileFormValuesZod>({
     resolver: zodResolver(updateUserProfileSchema),
-    defaultValues: { // Default values updated
+    defaultValues: { 
       displayName: userProfile?.displayName || user?.displayName || "",
       shippingName: userProfile?.defaultShippingAddress?.name || "",
       shippingEmail: userProfile?.defaultShippingAddress?.email || "",
@@ -114,7 +112,7 @@ export default function ProfilePage() {
   
   useEffect(() => {
     if (userProfile && isEditProfileDialogOpen && !editProfileForm.formState.isDirty) {
-      editProfileForm.reset({ // Reset updated
+      editProfileForm.reset({ 
         displayName: userProfile.displayName || user?.displayName || "",
         shippingName: userProfile.defaultShippingAddress?.name || "",
         shippingEmail: userProfile.defaultShippingAddress?.email || "",
@@ -128,27 +126,67 @@ export default function ProfilePage() {
 
 
   useEffect(() => {
-    if (user?.uid) {
-      const fetchOrders = async () => {
-        setIsLoadingOrders(true);
-        try {
-          const ordersRef = collection(db, "orders");
-          const q = query(ordersRef, where("userId", "==", user.uid), orderBy("createdAt", "desc"));
-          const querySnapshot = await getDocs(q);
-          const userOrders: Order[] = [];
-          querySnapshot.forEach((doc) => {
-            userOrders.push({ id: doc.id, ...doc.data() } as Order);
-          });
-          setOrders(userOrders);
-        } catch (error) {
-          console.error("Error fetching orders: ", error);
-        } finally {
-          setIsLoadingOrders(false);
-        }
-      };
-      fetchOrders();
+    if (!user?.uid) {
+      setOrders([]);
+      setIsLoadingOrders(false);
+      initialDataLoadedRef.current = false; // Reset when user logs out
+      return;
     }
-  }, [user?.uid]);
+
+    setIsLoadingOrders(true);
+    // initialDataLoadedRef.current is false here, will be set to true after first snapshot
+    
+    const ordersQuery = query(
+      collection(db, "orders"),
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
+      const fetchedOrders: Order[] = snapshot.docs.map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as Order));
+
+      if (initialDataLoadedRef.current) {
+        // Only compare and notify after the initial data load
+        fetchedOrders.forEach(newOrder => {
+          const oldOrder = orders.find(o => o.id === newOrder.id);
+          if (oldOrder && oldOrder.status !== newOrder.status) {
+            // Check if updatedAt exists and is more recent, or if status simply changed
+            const newOrderUpdatedAtMs = newOrder.updatedAt?.toMillis ? newOrder.updatedAt.toMillis() : 0;
+            const oldOrderUpdatedAtMs = oldOrder.updatedAt?.toMillis ? oldOrder.updatedAt.toMillis() : 0;
+
+            if (newOrderUpdatedAtMs > oldOrderUpdatedAtMs || (!newOrder.updatedAt && oldOrder.status !== newOrder.status)) {
+               toast({
+                title: "Actualización de Pedido",
+                description: `El estado de tu pedido #${newOrder.id?.substring(0, 8)}... es ahora: ${newOrder.status}.`,
+                duration: 7000,
+              });
+            }
+          }
+        });
+      } else {
+        // This is the first data snapshot
+        initialDataLoadedRef.current = true;
+      }
+
+      setOrders(fetchedOrders);
+      setIsLoadingOrders(false);
+    }, (error) => {
+      console.error("Error fetching orders with onSnapshot: ", error);
+      toast({
+        title: "Error al Cargar Pedidos",
+        description: "No se pudieron obtener los pedidos en tiempo real.",
+        variant: "destructive",
+      });
+      setIsLoadingOrders(false);
+    });
+
+    // Cleanup subscription on unmount or if user.uid changes
+    return () => {
+      unsubscribe();
+      initialDataLoadedRef.current = false; // Reset for next user or remount
+    };
+  }, [user?.uid, toast, orders]); // `orders` is included for comparison logic with the current state
+
 
   async function onSubmitPasswordChange(data: ChangePasswordFormValues) {
     try {
@@ -161,7 +199,6 @@ export default function ProfilePage() {
   }
 
   async function onSubmitEditProfile(data: UpdateUserProfileFormValuesZod) {
-    // Map data, removing payment fields explicitly for clarity if needed
     const mappedData: UpdateUserProfileFormValues = {
       displayName: data.displayName || '',
       shippingName: data.shippingName || '',
@@ -267,7 +304,6 @@ export default function ProfilePage() {
                     </CardContent>
                   </Card>
                 )}
-                {/* Payment method section removed */}
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
@@ -312,7 +348,6 @@ export default function ProfilePage() {
                                             <FormField control={editProfileForm.control} name="shippingPhone" render={({ field }) => ( <FormItem> <FormLabel>Teléfono (Opcional)</FormLabel> <FormControl><Input placeholder="Número de teléfono" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                                         </AccordionContent>
                                     </AccordionItem>
-                                   {/* Payment AccordionItem removed */}
                                 </Accordion>
                                 <DialogFooter className="mt-6">
                                     <DialogClose asChild><Button type="button" variant="ghost">Cancelar</Button></DialogClose>
@@ -449,3 +484,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

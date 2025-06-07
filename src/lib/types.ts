@@ -64,6 +64,7 @@ export interface Order {
   shippingAddress: ShippingAddressDetails; 
   paymentDetails: PaymentDetails; 
   createdAt: any; 
+  updatedAt?: any; // Added for tracking status updates
   status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'PaymentFailed'; 
 }
 
@@ -76,3 +77,4 @@ export interface UpdateUserProfileFormValues {
   shippingPostalCode: string;
   shippingPhone?: string;
 }
+

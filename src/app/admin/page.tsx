@@ -15,6 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { getDownloadURL, ref as storageRef, uploadBytesResumable, deleteObject } from "firebase/storage";
+
 
 import {
   Table,
@@ -237,13 +239,14 @@ export default function AdminPage() {
           try { await deleteObject(storageRef(storage, editingProduct.imageUrl)); } 
           catch (error) { console.warn("Could not delete old image:", error); }
         }
-        const uploadTask = uploadBytesResumable(storageRef(storage, `products/${editingProduct.id}/${imageFile.name}`), imageFile);
+        const imageRef = storageRef(storage, `products/${editingProduct.id}/${imageFile.name}`);
+        const uploadTask = uploadBytesResumable(imageRef, imageFile);
         finalImageUrl = await new Promise<string>((resolve, reject) => {
           uploadTask.on('state_changed', (s) => setUploadProgress((s.bytesTransferred / s.totalBytes) * 100), reject, 
           async () => resolve(await getDownloadURL(uploadTask.snapshot.ref)));
         });
       }
-      await updateDoc(doc(db, 'products', editingProduct.id), { ...formData, price: Number(formData.price), imageUrl: finalImageUrl });
+      await updateDoc(doc(db, 'products', editingProduct.id), { ...formData, price: Number(formData.price), imageUrl: finalImageUrl, updatedAt: serverTimestamp() });
       toast({ title: "Producto Actualizado", description: `"${formData.name}" actualizado.` });
       setIsEditModalOpen(false); setEditingProduct(null); resetImageStates(); fetchProducts();
     } catch (error) {
@@ -255,10 +258,11 @@ export default function AdminPage() {
   const handleAddNewProduct = async (formData: ProductFormValues) => {
     setIsUploading(true); setUploadProgress(0);
     try {
-      const newDocRef = await addDoc(collection(db, 'products'), { ...formData, price: Number(formData.price), imageUrl: '', createdAt: serverTimestamp() });
+      const newDocRef = await addDoc(collection(db, 'products'), { ...formData, price: Number(formData.price), imageUrl: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       let finalImageUrl = DEFAULT_PLACEHOLDER_IMAGE;
       if (imageFile) {
-        const uploadTask = uploadBytesResumable(storageRef(storage, `products/${newDocRef.id}/${imageFile.name}`), imageFile);
+        const imageRef = storageRef(storage, `products/${newDocRef.id}/${imageFile.name}`);
+        const uploadTask = uploadBytesResumable(imageRef, imageFile);
         finalImageUrl = await new Promise<string>((resolve, reject) => {
           uploadTask.on('state_changed', (s) => setUploadProgress((s.bytesTransferred / s.totalBytes) * 100), reject, 
           async () => resolve(await getDownloadURL(uploadTask.snapshot.ref)));

@@ -66,7 +66,8 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
         - [x] Asegurar y verificar firmas de webhook.
     - [x] Configurar Stripe CLI para pruebas locales de webhooks.
 - [ ] **Seguimiento de Pedidos en Tiempo Real (simulado o básico con Firestore):**
-    - [ ] Actualización del estado del pedido (ej. Preparando, En camino, Entregado).
+    - [x] Actualización del estado del pedido (ej. Preparando, En camino, Entregado) - *Simulado en cliente con toasts*.
+    - [ ] Implementar notificaciones Push reales (ej. FCM) para cambios de estado de pedido.
 - [ ] **Internacionalización (i18n):**
     - [ ] Soporte para múltiples idiomas (ej. Inglés y Español).
 
@@ -106,3 +107,4 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
 - [ ] Añadir guías para desarrolladores (cómo levantar el entorno, convenciones de código).
 
 Este listado es dinámico y se actualizará a medida que el proyecto avance.
+
