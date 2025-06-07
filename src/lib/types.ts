@@ -13,49 +13,52 @@ export interface CartItem extends Product {
   quantity: number;
 }
 
-// Renamed from OrderDetails to ShippingAddressDetails for clarity
 export interface ShippingAddressDetails {
-  name: string; // Name on the shipping address, might be different from account name
-  email: string; // Email for shipping confirmation, might be different
+  name: string; 
+  email: string; 
   address: string;
   city: string;
   postalCode: string;
   phone?: string;
 }
 
-export interface PaymentDetails {
-  cardNumber: string; // Keep as string for formatting
+// Simulated payment details for storage (non-sensitive parts)
+export interface SimulatedPaymentMethod {
+  last4Digits: string;
   expiryDate: string; // MM/YY
+  // cardBrand?: string; // Optional: could add logic to determine brand
+}
+
+// Full payment details for form submission (still simulated)
+export interface PaymentDetails {
+  cardNumber: string; 
+  expiryDate: string; 
   cvv: string;
 }
 
-// User type for Firebase Auth data
 export interface User {
-  uid: string;         // Firebase User ID
-  email: string | null; // Firebase User email
-  displayName?: string | null; // Firebase User display name
+  uid: string;        
+  email: string | null; 
+  displayName?: string | null; 
 }
 
-// New UserProfile type for Firestore "users" collection
 export interface UserProfile {
   uid: string;
   email: string | null;
   displayName?: string | null;
   defaultShippingAddress?: ShippingAddressDetails | null; 
-  createdAt: any; // Firestore Timestamp
-  updatedAt: any; // Firestore Timestamp
+  defaultPaymentMethod?: SimulatedPaymentMethod | null; // Added
+  createdAt: any; 
+  updatedAt: any; 
 }
 
-
-// Order interface
 export interface Order {
-  id?: string; // Firestore document ID
+  id?: string; 
   userId: string;
   items: CartItem[];
   totalAmount: number;
-  shippingAddress: ShippingAddressDetails; // Uses the renamed type
-  paymentDetails: PaymentDetails; // Still simulated
-  createdAt: any; // Firestore Timestamp
+  shippingAddress: ShippingAddressDetails; 
+  paymentDetails: PaymentDetails; 
+  createdAt: any; 
   status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
 }
-

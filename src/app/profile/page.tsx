@@ -6,16 +6,16 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone } from 'lucide-react';
+import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone, CreditCardIcon } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
-import type { Order, UserProfile } from '@/lib/types'; // Import UserProfile
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import type { Order } from '@/lib/types'; 
 import Image from 'next/image';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
 
 export default function ProfilePage() {
-  const { user, userProfile, logout, isLoading: authIsLoading, isLoadingUserProfile } = useAuth(); // Get userProfile
+  const { user, userProfile, logout, isLoading: authIsLoading, isLoadingUserProfile } = useAuth(); 
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -49,7 +49,7 @@ export default function ProfilePage() {
     }
   }, [user?.uid]);
 
-  if (authIsLoading || isLoadingUserProfile || !user) { // Check isLoadingUserProfile as well
+  if (authIsLoading || isLoadingUserProfile || !user) { 
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-20rem)]">
         <p className="text-lg text-muted-foreground">Cargando perfil...</p>
@@ -100,7 +100,7 @@ export default function ProfilePage() {
                 </div>
             )}
              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                <UserCircle className="h-5 w-5 text-primary" />
+                <UserCircle className="h-5 w-5 text-primary" /> {/* Consider changing icon if UID is not user-facing */}
                 <div>
                     <p className="text-sm font-medium text-muted-foreground">User ID (UID)</p>
                     <p className="text-md font-semibold break-all">{user.uid}</p>
@@ -119,11 +119,23 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
             )}
+            {userProfile?.defaultPaymentMethod && (
+              <Card className="mt-4">
+                <CardHeader>
+                  <CardTitle className="text-lg font-headline flex items-center gap-2"><CreditCardIcon className="h-5 w-5"/> Método de Pago Predeterminado (Simulado)</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm space-y-1">
+                  <p><strong>Tarjeta terminada en:</strong> •••• {userProfile.defaultPaymentMethod.last4Digits}</p>
+                  <p><strong>Fecha de caducidad:</strong> {userProfile.defaultPaymentMethod.expiryDate}</p>
+                  <p className="text-xs text-muted-foreground">(Solo se almacenan los últimos 4 dígitos y la fecha de caducidad. CVV nunca se guarda.)</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
             <Button variant="outline" disabled>
-              <Edit3 /> Editar Perfil y Dirección (Próximamente)
+              <Edit3 /> Editar Perfil, Dirección y Pago (Próximamente)
             </Button>
             <Button variant="outline" disabled>
               <ShieldCheck /> Cambiar Contraseña (Próximamente)
@@ -229,4 +241,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

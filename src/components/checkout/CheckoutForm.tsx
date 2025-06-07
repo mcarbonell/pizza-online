@@ -20,10 +20,10 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreditCard, User as UserIcon, Mail, Home, Phone, Save } from 'lucide-react';
+import { CreditCard, User as UserIcon, Save } from 'lucide-react';
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
-import type { ShippingAddressDetails, PaymentDetails, Order, UserProfile } from "@/lib/types";
+import type { ShippingAddressDetails, PaymentDetails, Order, SimulatedPaymentMethod } from "@/lib/types";
 import { useEffect, useState } from "react";
 
 const addressSchema = z.object({
@@ -48,6 +48,7 @@ const paymentSchema = z.object({
 
 const checkoutFormSchema = addressSchema.merge(paymentSchema).extend({
   saveAddress: z.boolean().default(true).optional(),
+  savePaymentMethod: z.boolean().default(true).optional(), // Added
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutFormSchema>;
@@ -72,6 +73,7 @@ export default function CheckoutForm() {
       expiryDate: "",
       cvv: "",
       saveAddress: true,
+      savePaymentMethod: true, // Added
     },
   });
 
@@ -84,7 +86,15 @@ export default function CheckoutForm() {
         address: userProfile.defaultShippingAddress?.address || '',
         city: userProfile.defaultShippingAddress?.city || '',
         postalCode: userProfile.defaultShippingAddress?.postalCode || '',
-        saveAddress: true, // Default to true if we have address data
+        saveAddress: !!userProfile.defaultShippingAddress, // Check if address exists
+        
+        // Pre-fill payment if available
+        cardNumber: userProfile.defaultPaymentMethod?.last4Digits 
+          ? `•••• •••• •••• ${userProfile.defaultPaymentMethod.last4Digits}` 
+          : '',
+        expiryDate: userProfile.defaultPaymentMethod?.expiryDate || '',
+        cvv: '', // CVV is never pre-filled or stored
+        savePaymentMethod: !!userProfile.defaultPaymentMethod, // Check if payment method exists
       };
       form.reset(defaultVals);
       setIsFormPreFilled(true);
@@ -103,6 +113,13 @@ export default function CheckoutForm() {
       return;
     }
 
+    // If card number is masked, use the original full number if it was being edited, or prompt user.
+    // For this simulation, we'll assume if it's masked, they are using the "stored" card and don't re-type it.
+    // A real implementation would require more complex logic or reliance on a payment gateway's token.
+    const actualCardNumber = (data.cardNumber.startsWith("••••") && userProfile?.defaultPaymentMethod)
+      ? `SIMULATED_CARD_ENDING_IN_${userProfile.defaultPaymentMethod.last4Digits}` // This won't be the actual number, just for Firestore
+      : data.cardNumber;
+
     const shippingAddressPayload: ShippingAddressDetails = {
       name: data.name,
       email: data.email,
@@ -113,7 +130,7 @@ export default function CheckoutForm() {
     };
 
     const paymentDetailsPayload: PaymentDetails = {
-      cardNumber: data.cardNumber, 
+      cardNumber: actualCardNumber, // Use actualCardNumber for the order record
       expiryDate: data.expiryDate,
       cvv: data.cvv,
     };
@@ -129,19 +146,30 @@ export default function CheckoutForm() {
     };
 
     try {
-      // Save/Update shipping address in user's profile if checked
-      if (data.saveAddress && user) {
-        const userRef = doc(db, "users", user.uid);
-        await updateDoc(userRef, {
-          defaultShippingAddress: shippingAddressPayload,
-          updatedAt: serverTimestamp(),
-        });
-        await fetchUserProfile(user.uid); // Refresh profile data in context
-        toast({
-          title: "Dirección Guardada",
-          description: "Tu dirección de envío ha sido guardada para futuros pedidos.",
-          variant: "default",
-        });
+      const userRef = doc(db, "users", user.uid);
+      const updatesToUserProfile: Partial<typeof userProfile> = { updatedAt: serverTimestamp() };
+
+      if (data.saveAddress) {
+        updatesToUserProfile.defaultShippingAddress = shippingAddressPayload;
+      }
+
+      if (data.savePaymentMethod) {
+        const last4 = data.cardNumber.slice(-4);
+        const simulatedPayment: SimulatedPaymentMethod = {
+          last4Digits: last4,
+          expiryDate: data.expiryDate,
+        };
+        updatesToUserProfile.defaultPaymentMethod = simulatedPayment;
+      }
+      
+      if (Object.keys(updatesToUserProfile).length > 1) { // more than just updatedAt
+          await updateDoc(userRef, updatesToUserProfile);
+          await fetchUserProfile(user.uid); 
+          toast({
+            title: "Información Guardada",
+            description: "Tu información de envío y/o pago (simulada) ha sido guardada.",
+            variant: "default",
+          });
       }
       
       const docRef = await addDoc(collection(db, "orders"), orderData);
@@ -163,6 +191,13 @@ export default function CheckoutForm() {
       });
     }
   }
+  
+  // Handle card number input: if it's pre-filled and user starts typing, clear the mask.
+  const handleCardNumberFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (e.target.value.startsWith("••••")) {
+      form.setValue("cardNumber", "");
+    }
+  };
 
   return (
     <Form {...form}>
@@ -286,7 +321,11 @@ export default function CheckoutForm() {
               <FormItem>
                 <FormLabel>Card Number</FormLabel>
                 <FormControl>
-                  <Input placeholder="•••• •••• •••• ••••" {...field} />
+                  <Input 
+                    placeholder="•••• •••• •••• ••••" 
+                    {...field} 
+                    onFocus={handleCardNumberFocus}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -320,11 +359,30 @@ export default function CheckoutForm() {
               )}
             />
           </div>
+           <FormField
+              control={form.control}
+              name="savePaymentMethod"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm mt-6">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel className="cursor-pointer">
+                      Guardar esta tarjeta para futuros pedidos (simulado)
+                    </FormLabel>
+                  </div>
+                </FormItem>
+              )}
+            />
           </CardContent>
         </Card>
         
         <Button type="submit" size="lg" className="w-full bg-primary hover:bg-primary/90 text-lg py-3" disabled={form.formState.isSubmitting || authLoading || !user}>
-          {form.formState.isSubmitting ? 'Processing...' : 'Pay and Place Order'}
+          {form.formState.isSubmitting ? 'Procesando...' : 'Pagar y Realizar Pedido'}
         </Button>
       </form>
     </Form>
