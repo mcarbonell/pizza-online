@@ -1,6 +1,6 @@
 # Funcionalidades Implementadas (DONE)
 
-Este documento registra las características y tareas que ya se han completado en el proyecto PizzaPlace.
+Este documento registra las características y tareas que ya se han completado en el proyecto Pizzería Serranillo.
 
 ## Funcionalidades Implementadas
 - **Menú Interactivo de Productos:**
@@ -17,15 +17,16 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Cálculo en tiempo real del subtotal y número total de artículos.
     - [x] Persistencia del carrito entre sesiones utilizando Local Storage.
     - [x] Botón para abrir/cerrar el carrito en la cabecera.
-- **Proceso de Checkout (Simulado):**
+- **Proceso de Checkout (Integrado con Stripe):**
     - [x] Formulario de checkout para información de contacto y entrega.
-    - [x] Formulario de checkout para detalles de pago (simulados).
     - [x] Validación de campos del formulario usando React Hook Form y Zod.
     - [x] Resumen del pedido en la página de checkout.
-    - [x] Redirección a la página principal y limpieza del carrito tras un "pago" exitoso.
+    - [x] Creación de sesión de pago con Stripe.
+    - [x] Redirección a la pasarela de pago de Stripe.
+    - [x] Páginas de éxito y cancelación de pago.
+    - [x] Webhook de Stripe para procesar pedidos completados y guardarlos en Firestore.
+    - [x] Limpieza del carrito tras un pago exitoso.
     - [x] Mensaje de "Carrito vacío" en la página de checkout si no hay artículos.
-    - [x] Guardado de pedido en Firestore.
-    - [x] Opción para guardar dirección de envío y método de pago (simulado) en el perfil del usuario.
 - **Diseño y UI/UX:**
     - [x] Diseño responsivo adaptado a dispositivos móviles, tabletas y escritorio.
     - [x] Interfaz de usuario moderna y atractiva utilizando ShadCN UI components.
@@ -35,6 +36,7 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Paleta de colores y tipografía consistentes (definidas en `globals.css` y `tailwind.config.ts`).
     - [x] Componente de cabecera (Header) con logo y acceso al carrito.
     - [x] Componente de pie de página (Footer) básico.
+    - [x] Reordenamiento de pestañas en perfil de cliente y panel de admin para mejor UX.
 - **Estructura del Proyecto y Configuración:**
     - [x] Proyecto Next.js configurado con App Router.
     - [x] Uso de TypeScript.
@@ -56,8 +58,10 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Visualización de estado de verificación en perfil.
 - **Perfil de Usuario:**
     - [x] Página de perfil (`/profile`) para ver información del usuario y de Firebase Auth.
-    - [x] Visualización del historial de pedidos del usuario desde Firestore.
-    - [x] Edición de nombre, dirección de envío predeterminada y método de pago (simulado) predeterminado.
+    - [x] Visualización del historial de pedidos del usuario desde Firestore (con actualizaciones en tiempo real y toasts de notificación de cambio de estado).
+    - [x] Edición de nombre, dirección de envío predeterminada.
+    - [x] Estados de pedido con colores distintivos.
+    - [x] Ocultar UID de la vista del cliente.
 - **Panel de Administración (`/admin`):**
     - [x] Ruta `/admin` protegida por rol 'admin' (definido en perfil de usuario en Firestore).
     - [x] Enlace condicional al panel de admin en el Header.
@@ -67,8 +71,14 @@ Este documento registra las características y tareas que ya se han completado e
         - [x] Añadir nuevos productos con subida de imagen a Firebase Storage.
         - [x] Editar productos existentes con subida/actualización de imagen a Firebase Storage.
         - [x] Eliminar productos (con eliminación de imagen asociada de Firebase Storage).
+    - [x] Visualización y gestión de pedidos recibidos (cambio de estado).
+    - [x] Visualización y gestión de roles de usuarios.
 - **Documentación Inicial:**
     - [x] `README.md` básico explicando el proyecto. (Actualizado a versión más detallada)
     - [x] Creación de archivos de planificación del proyecto: `docs/TODO.md`, `docs/DONE.md`, `docs/ARCHITECTURE.md`, `docs/BUGS.md`.
+- **PWA (Progressive Web App):**
+    - [x] Añadido `next-pwa` y configuración básica.
+    - [x] Creado `manifest.json`.
+    - [x] Enlaces y metadatos en `layout.tsx`. (Iconos deben ser creados manualmente por el usuario).
 
 Esta lista se actualizará a medida que se completen más tareas del archivo `TODO.md`.

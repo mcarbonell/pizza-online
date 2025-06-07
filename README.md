@@ -1,15 +1,16 @@
-# PizzaPlace - Tu Pizzería Online
+# Pizzería Serranillo - Tu Pizzería Online
 
-¡Bienvenido a PizzaPlace! Esta es una aplicación web moderna construida con Next.js y React, diseñada para permitir a los usuarios explorar un menú de pizzas, acompañamientos, bebidas y postres, agregarlos a un carrito de compras y realizar un pedido.
+¡Bienvenido a Pizzería Serranillo! Esta es una aplicación web moderna construida con Next.js y React, diseñada para permitir a los usuarios explorar un menú de pizzas, acompañamientos, bebidas y postres, agregarlos a un carrito de compras y realizar un pedido.
 
 ## Características Principales
 
 - **Menú Interactivo:** Navega por las diferentes categorías de productos (Pizzas, Acompañamientos, Bebidas, Postres) y visualiza los detalles de cada artículo.
 - **Carrito de Compras:** Agrega productos a tu carrito, ajusta las cantidades o elimina artículos fácilmente. El carrito se actualiza en tiempo real y persiste entre sesiones utilizando el almacenamiento local del navegador.
-- **Proceso de Checkout:** Un formulario de pago simulado donde los usuarios pueden ingresar su información de contacto, dirección de entrega y detalles de pago (simulados).
+- **Proceso de Checkout:** Un formulario de pago integrado con Stripe donde los usuarios pueden ingresar su información de contacto, dirección de entrega y realizar el pago.
 - **Diseño Responsivo:** La aplicación está diseñada para funcionar sin problemas en dispositivos de escritorio, tabletas y móviles.
 - **Estilo Moderno:** Utiliza ShadCN UI para componentes de interfaz de usuario elegantes y Tailwind CSS para un diseño personalizable y eficiente.
 - **Notificaciones:** Se utilizan "toasts" para proporcionar retroalimentación al usuario, como cuando se agrega un artículo al carrito o se realiza un pedido.
+- **PWA (Progressive Web App):** Habilitada para una experiencia similar a una aplicación nativa, incluyendo la posibilidad de instalarla.
 
 ## Tecnologías Utilizadas
 
@@ -20,16 +21,24 @@
 - **Tailwind CSS:** Framework de CSS de utilidad primero para un diseño rápido y personalizable.
 - **Lucide Icons:** Biblioteca de iconos SVG ligeros y personalizables.
 - **React Hook Form & Zod:** Para la gestión y validación de formularios.
+- **Firebase:**
+    - Authentication: Para el registro e inicio de sesión de usuarios (Email/Password, Google).
+    - Firestore: Como base de datos NoSQL para almacenar productos, pedidos y perfiles de usuario.
+    - Storage: Para almacenar imágenes de productos.
+- **Stripe:** Para el procesamiento de pagos.
 - **Genkit (para IA):** Aunque no implementado activamente en la funcionalidad principal de pedidos, la estructura está preparada para integrar funciones de IA con Genkit si fuera necesario.
+- **next-pwa:** Para habilitar la funcionalidad de Progressive Web App.
 
 ## Cómo Empezar
 
 Para ejecutar este proyecto localmente:
 
 1.  Clona el repositorio.
-2.  Instala las dependencias: `npm install`
-3.  Inicia el servidor de desarrollo: `npm run dev`
-4.  Abre [http://localhost:9002](http://localhost:9002) (o el puerto que hayas configurado) en tu navegador.
+2.  Configura tus variables de entorno en un archivo `.env.local` (ver `.env.local.example` si existe o configura las variables de Firebase y Stripe).
+3.  Instala las dependencias: `npm install`
+4.  Inicia el servidor de desarrollo: `npm run dev`
+5.  Abre [http://localhost:9002](http://localhost:9002) (o el puerto que hayas configurado) en tu navegador.
+6.  Para probar los webhooks de Stripe localmente, ejecuta en otra terminal: `stripe listen --forward-to localhost:9002/api/stripe/webhook` (asegúrate de tener Stripe CLI instalado y configurado).
 
 El código fuente principal de la aplicación se encuentra en el directorio `src/`. La página de inicio es `src/app/page.tsx`.
 

@@ -1,6 +1,6 @@
 # Registro de Bugs y Soluciones
 
-Este documento sirve para rastrear los bugs encontrados en el proyecto PizzaPlace, junto con sus soluciones o estado actual.
+Este documento sirve para rastrear los bugs encontrados en el proyecto Pizzería Serranillo, junto con sus soluciones o estado actual.
 
 ## Formato para Registrar un Bug
 
@@ -37,7 +37,7 @@ Este documento sirve para rastrear los bugs encontrados en el proyecto PizzaPlac
 **Fecha Reportado:** 2024-07-29
 **Reportado por:** App Prototyper
 **Prioridad:** Baja
-**Estado:** Abierto
+**Estado:** Resuelto (2024-07-31 por App Prototyper)
 
 **Descripción:**
 En la página de Checkout (`/checkout`), si el carrito está vacío, se muestra un mensaje "Your Cart is Empty" y un botón "Go Back to Menu". Sin embargo, el título principal "Checkout" y el resumen del pedido (que mostraría 0 artículos) aún podrían estar visibles o causar un layout menos ideal antes de que el mensaje de carrito vacío se renderice completamente. El `totalItems === 0` se verifica y el retorno temprano sucede, pero el resto del layout de la página podría intentar renderizarse brevemente.
@@ -48,11 +48,11 @@ La página de checkout debería mostrar limpiamente solo el mensaje de "Carrito 
 **Comportamiento Actual:**
 El mensaje se muestra, pero existe la posibilidad de un breve parpadeo o renderizado parcial de otros elementos de la página de checkout.
 
-**Solución Propuesta / Implementada:**
-Revisar la lógica de renderizado condicional en `src/app/checkout/page.tsx`. Asegurarse de que el retorno temprano para un carrito vacío impida el renderizado de cualquier otra parte del layout de checkout. Considerar mover la lógica de `totalItems === 0` más arriba en el componente o usar un estado para controlar la visibilidad de las secciones.
+**Solución Implementada:**
+La lógica de verificación `totalItems === 0` se movió más arriba en el componente `CheckoutPage` y se asegura que ocurra después de la verificación de autenticación del usuario. Además, se añadió `typeof window !== 'undefined'` para asegurar que la lógica que depende del estado del carrito se ejecute solo en el cliente, evitando parpadeos durante el SSR/hidratación si el carrito está vacío.
 
-**Fecha Resuelto:**
-**Resuelto por:**
+**Fecha Resuelto:** 2024-07-31
+**Resuelto por:** App Prototyper
 
 ---
 <!-- Añadir nuevos bugs aquí -->

@@ -7,8 +7,8 @@ import { Toaster } from "@/components/ui/toaster";
 import Header from '@/components/layout/Header';
 
 export const metadata: Metadata = {
-  title: 'PizzaPlace - Delicious Pizza & More',
-  description: 'Order your favorite pizza, sides, and drinks online from PizzaPlace!',
+  title: 'Pizzería Serranillo - Pizzas y Más',
+  description: '¡Pide tu pizza favorita, acompañamientos y bebidas online en Pizzería Serranillo!',
   manifest: '/manifest.json', // Link to the manifest file
   themeColor: '#E63946', // Corresponds to primary color
 };
@@ -38,7 +38,7 @@ export default function RootLayout({
                 {children}
               </main>
               <footer className="bg-primary text-primary-foreground py-6 text-center">
-                <p className="font-body">&copy; {new Date().getFullYear()} PizzaPlace. All rights reserved.</p>
+                <p className="font-body">&copy; {new Date().getFullYear()} Pizzería Serranillo. Todos los derechos reservados.</p>
               </footer>
             </div>
             <Toaster />

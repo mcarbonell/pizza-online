@@ -1,23 +1,22 @@
 {
-  "name": "PizzaPlace - Tu Pizzería Online",
-  "short_name": "PizzaPlace",
-  "description": "Pide deliciosas pizzas, acompañamientos, bebidas y postres online desde PizzaPlace!",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#F1FAEE",
-  "theme_color": "#E63946",
+  "name": "Pizzería Serranillo",
+  "short_name": "Serranillo",
+  "description": "¡Pide tu pizza favorita, acompañamientos y bebidas online en Pizzería Serranillo!",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     },
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
-  ]
+  ],
+  "theme_color": "#E63946",
+  "background_color": "#F1FAEE",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait"
 }
