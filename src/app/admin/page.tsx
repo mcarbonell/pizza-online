@@ -6,12 +6,15 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, orderBy, writeBatch, doc } from 'firebase/firestore'; // Added doc
+import { collection, getDocs, query, orderBy, writeBatch, doc, updateDoc } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
-import { initialProductData } from '@/data/products'; 
+import { initialProductData } from '@/data/products';
 import { useToast } from '@/hooks/use-toast';
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 
 import {
   Table,
@@ -36,6 +39,42 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const productCategories = ['Pizzas', 'Sides', 'Drinks', 'Desserts'] as const;
+
+const productFormSchema = z.object({
+  name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
+  description: z.string().min(10, { message: "La descripción debe tener al menos 10 caracteres." }),
+  price: z.preprocess(
+    (val) => {
+      if (typeof val === 'string') return parseFloat(val.replace(',', '.'));
+      if (typeof val === 'number') return val;
+      return NaN;
+    },
+    z.number({ invalid_type_error: "El precio debe ser un número."}).positive({ message: "El precio debe ser un número positivo." })
+  ),
+  category: z.enum(productCategories, {
+    errorMap: () => ({ message: "Por favor selecciona una categoría válida." }),
+  }),
+  imageUrl: z.string().url({ message: "Por favor introduce una URL de imagen válida." }).or(z.literal('')),
+  dataAiHint: z.string().optional(),
+});
+
+type ProductFormValues = z.infer<typeof productFormSchema>;
 
 
 export default function AdminPage() {
@@ -46,6 +85,21 @@ export default function AdminPage() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [productError, setProductError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const form = useForm<ProductFormValues>({
+    resolver: zodResolver(productFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      price: 0,
+      category: "Pizzas",
+      imageUrl: "",
+      dataAiHint: "",
+    },
+  });
 
   const fetchProducts = useCallback(async () => {
     setIsLoadingProducts(true);
@@ -80,12 +134,26 @@ export default function AdminPage() {
     }
   }, [user, userProfile, authIsLoading, isLoadingUserProfile, router, fetchProducts]);
 
+  useEffect(() => {
+    if (editingProduct) {
+      form.reset({
+        name: editingProduct.name,
+        description: editingProduct.description,
+        price: editingProduct.price,
+        category: editingProduct.category as typeof productCategories[number], // Cast needed if Product category is wider
+        imageUrl: editingProduct.imageUrl,
+        dataAiHint: editingProduct.dataAiHint || "",
+      });
+    }
+  }, [editingProduct, form]);
+
+
   const handleImportInitialMenu = async () => {
     setIsImporting(true);
     try {
       const batch = writeBatch(db);
       const productsCollection = collection(db, 'products');
-      
+
       initialProductData.forEach(productData => {
         const newProductRef = doc(productsCollection); // Firestore generates ID
         batch.set(newProductRef, productData);
@@ -97,7 +165,7 @@ export default function AdminPage() {
         description: `${initialProductData.length} productos han sido importados a Firestore.`,
         variant: "default",
       });
-      fetchProducts(); // Refresh product list
+      fetchProducts();
     } catch (error) {
       console.error("Error importing initial menu:", error);
       toast({
@@ -107,6 +175,35 @@ export default function AdminPage() {
       });
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const handleOpenEditModal = (product: Product) => {
+    setEditingProduct(product);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateProduct = async (data: ProductFormValues) => {
+    if (!editingProduct) return;
+
+    try {
+      const productRef = doc(db, 'products', editingProduct.id);
+      await updateDoc(productRef, data);
+      toast({
+        title: "Producto Actualizado",
+        description: `El producto "${data.name}" ha sido actualizado correctamente.`,
+        variant: "default",
+      });
+      setIsEditModalOpen(false);
+      setEditingProduct(null);
+      fetchProducts();
+    } catch (error) {
+      console.error("Error updating product:", error);
+      toast({
+        title: "Error al Actualizar",
+        description: "No se pudo actualizar el producto. Revisa la consola para más detalles.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -129,7 +226,7 @@ export default function AdminPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="container mx-auto py-12 px-4">
       <Card className="shadow-xl">
@@ -234,7 +331,7 @@ export default function AdminPage() {
                       <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex justify-center gap-1 sm:gap-2">
-                          <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" disabled>
+                          <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => handleOpenEditModal(product)}>
                             <Edit className="h-4 w-4" />
                              <span className="sr-only">Editar</span>
                           </Button>
@@ -257,8 +354,116 @@ export default function AdminPage() {
             </p>
         </CardFooter>
       </Card>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => {
+        setIsEditModalOpen(isOpen);
+        if (!isOpen) {
+          setEditingProduct(null);
+          form.reset();
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Edit className="h-5 w-5"/> Editar Producto</DialogTitle>
+            <DialogDescription>
+              Modifica los detalles del producto "{editingProduct?.name}". Haz clic en guardar cuando termines.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleUpdateProduct)} className="space-y-4 py-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre del Producto</FormLabel>
+                    <FormControl><Input placeholder="Ej: Pizza Margherita" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Descripción</FormLabel>
+                    <FormControl><Textarea placeholder="Describe el producto..." {...field} rows={3} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Precio ($)</FormLabel>
+                      <FormControl><Input type="number" placeholder="0.00" {...field} step="0.01" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoría</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona una categoría" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {productCategories.map(category => (
+                            <SelectItem key={category} value={category}>{category}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="imageUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>URL de la Imagen</FormLabel>
+                    <FormControl><Input placeholder="https://ejemplo.com/imagen.png" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="dataAiHint"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pista para IA (Opcional, 1-2 palabras)</FormLabel>
+                    <FormControl><Input placeholder="ej: pepperoni pizza" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter className="mt-6">
+                <DialogClose asChild>
+                  <Button type="button" variant="ghost">Cancelar</Button>
+                </DialogClose>
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Guardar Cambios
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
-    
