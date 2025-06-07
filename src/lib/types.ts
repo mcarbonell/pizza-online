@@ -17,6 +17,12 @@ export interface CartItem extends Product {
   quantity: number;
 }
 
+// Simplified cart item structure for Stripe metadata
+export interface SimplifiedCartItem {
+  id: string; // Product ID
+  quantity: number;
+}
+
 export interface ShippingAddressDetails {
   name: string; 
   email: string; 
@@ -26,12 +32,8 @@ export interface ShippingAddressDetails {
   phone?: string;
 }
 
-// This interface is updated to reflect what might be stored after a Stripe payment
-// The actual card details are NOT stored by us.
 export interface PaymentDetails {
-  stripePaymentIntentId: string | null; // Store the Stripe Payment Intent ID
-  // last4Digits?: string; // Could be retrieved from Stripe if needed
-  // cardBrand?: string; // Could be retrieved from Stripe if needed
+  stripePaymentIntentId: string | null; 
 }
 
 
@@ -50,7 +52,6 @@ export interface UserProfile {
   emailVerified?: boolean;
   role?: 'admin' | 'user'; 
   defaultShippingAddress?: ShippingAddressDetails | null; 
-  // defaultPaymentMethod is removed, Stripe handles saved payment methods.
   createdAt: any; 
   updatedAt: any; 
 }
@@ -58,15 +59,14 @@ export interface UserProfile {
 export interface Order {
   id?: string; 
   userId: string;
-  items: CartItem[];
+  items: CartItem[]; // Items will be fully detailed Product objects + quantity
   totalAmount: number;
   shippingAddress: ShippingAddressDetails; 
-  paymentDetails: PaymentDetails; // Updated to use the new PaymentDetails
+  paymentDetails: PaymentDetails; 
   createdAt: any; 
-  status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'PaymentFailed'; // Added PaymentFailed
+  status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'PaymentFailed'; 
 }
 
-// Schema for the edit profile form - payment fields removed
 export interface UpdateUserProfileFormValues {
   displayName: string;
   shippingName: string;
@@ -75,5 +75,4 @@ export interface UpdateUserProfileFormValues {
   shippingCity: string;
   shippingPostalCode: string;
   shippingPhone?: string;
-  // paymentLast4Digits and paymentExpiryDate are removed
 }

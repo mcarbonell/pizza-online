@@ -59,6 +59,12 @@ export async function POST(req: NextRequest) {
       quantity: item.quantity,
     }));
 
+    // Simplify cart items for metadata to avoid exceeding 500 char limit
+    const simplifiedCartItems = items.map(item => ({
+      id: item.id,
+      quantity: item.quantity,
+    }));
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items,
@@ -67,17 +73,19 @@ export async function POST(req: NextRequest) {
       cancel_url: cancelUrl,
       metadata: {
         userId: userId,
-        shippingAddress: JSON.stringify(shippingAddress), // Store shipping address for webhook
-        cartItems: JSON.stringify(items.map(item => ({id: item.id, name: item.name, imageUrl: item.imageUrl, dataAiHint: item.dataAiHint, quantity: item.quantity, price: item.price }))) // Store more complete cart item details for webhook
+        shippingAddress: JSON.stringify(shippingAddress),
+        cartItems: JSON.stringify(simplifiedCartItems) // Store simplified cart item details
       },
-      // You can also pass customer_email if you have it
-      // customer_email: shippingAddress.email, // If you want Stripe to prefill email
     });
 
     return NextResponse.json({ sessionId: session.id });
 
   } catch (error: any) {
     console.error('Error creating Stripe checkout session:', error);
+    // Check if the error is from Stripe and has a specific message
+    if (error.type === 'StripeInvalidRequestError' && error.message) {
+        return NextResponse.json({ error: `Stripe Error: ${error.message}` }, { status: error.statusCode || 500 });
+    }
     return NextResponse.json({ error: error.message || 'Failed to create checkout session' }, { status: 500 });
   }
 }
