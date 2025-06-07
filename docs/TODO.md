@@ -54,17 +54,17 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
     - [x] Visualización y gestión de pedidos recibidos (cambio de estado).
     - [x] Gestión de usuarios (roles básicos).
     - [ ] Gestión de categorías de productos.
-- [ ] **Integración de Pasarela de Pago Real (Stripe):**
+- [x] **Integración de Pasarela de Pago Real (Stripe):**
     - [x] Configurar cuenta de Stripe y obtener claves API (modo prueba).
     - [x] Añadir paquetes `stripe` y `@stripe/stripe-js`.
     - [x] Crear API route `/api/stripe/create-checkout-session`.
     - [x] Modificar `CheckoutForm.tsx` para redirigir a Stripe.
     - [x] Crear páginas de éxito (`/checkout/success`) y cancelación (`/checkout/cancel`).
-    - [ ] **Implementar Webhook de Stripe (`/api/stripe/webhook`):**
-        - [ ] Manejar evento `checkout.session.completed` para crear el pedido en Firestore.
+    - [x] **Implementar Webhook de Stripe (`/api/stripe/webhook`):**
+        - [x] Manejar evento `checkout.session.completed` para crear el pedido en Firestore.
         - [ ] Manejar otros eventos relevantes (ej. `payment_intent.succeeded`, `payment_intent.payment_failed`).
-        - [ ] Asegurar y verificar firmas de webhook.
-    - [ ] Configurar Stripe CLI para pruebas locales de webhooks.
+        - [x] Asegurar y verificar firmas de webhook.
+    - [x] Configurar Stripe CLI para pruebas locales de webhooks.
 - [ ] **Seguimiento de Pedidos en Tiempo Real (simulado o básico con Firestore):**
     - [ ] Actualización del estado del pedido (ej. Preparando, En camino, Entregado).
 - [ ] **Internacionalización (i18n):**
