@@ -14,16 +14,17 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCart } from "@/context/CartContext";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreditCard, User as UserIcon, Mail, Home, Phone } from 'lucide-react'; // Renamed User to UserIcon
-import { db } from "@/lib/firebase"; // Import Firestore instance
-import { collection, addDoc, serverTimestamp } from "firebase/firestore"; // Import Firestore functions
-import type { OrderDetails as OrderDetailsType, PaymentDetails, Order } from "@/lib/types";
-
+import { CreditCard, User as UserIcon, Mail, Home, Phone, Save } from 'lucide-react';
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+import type { ShippingAddressDetails, PaymentDetails, Order, UserProfile } from "@/lib/types";
+import { useEffect, useState } from "react";
 
 const addressSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -45,15 +46,18 @@ const paymentSchema = z.object({
     .regex(/^\d+$/, { message: "CVV must contain only digits." }),
 });
 
-const checkoutFormSchema = addressSchema.merge(paymentSchema);
+const checkoutFormSchema = addressSchema.merge(paymentSchema).extend({
+  saveAddress: z.boolean().default(true).optional(),
+});
 
 type CheckoutFormValues = z.infer<typeof checkoutFormSchema>;
 
 export default function CheckoutForm() {
-  const { user } = useAuth(); // Get current user
+  const { user, userProfile, fetchUserProfile, isLoading: authLoading, isLoadingUserProfile } = useAuth();
   const { cartItems, getCartTotal, clearCart } = useCart();
   const { toast } = useToast();
   const router = useRouter();
+  const [isFormPreFilled, setIsFormPreFilled] = useState(false);
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema),
@@ -67,8 +71,26 @@ export default function CheckoutForm() {
       cardNumber: "",
       expiryDate: "",
       cvv: "",
+      saveAddress: true,
     },
   });
+
+  useEffect(() => {
+    if (!isLoadingUserProfile && userProfile && !form.formState.isDirty && !isFormPreFilled) {
+      const defaultVals: Partial<CheckoutFormValues> = {
+        name: userProfile.defaultShippingAddress?.name || userProfile.displayName || '',
+        email: userProfile.defaultShippingAddress?.email || userProfile.email || '',
+        phone: userProfile.defaultShippingAddress?.phone || '',
+        address: userProfile.defaultShippingAddress?.address || '',
+        city: userProfile.defaultShippingAddress?.city || '',
+        postalCode: userProfile.defaultShippingAddress?.postalCode || '',
+        saveAddress: true, // Default to true if we have address data
+      };
+      form.reset(defaultVals);
+      setIsFormPreFilled(true);
+    }
+  }, [userProfile, isLoadingUserProfile, form, isFormPreFilled]);
+
 
   async function onSubmit(data: CheckoutFormValues) {
     if (!user) {
@@ -81,7 +103,7 @@ export default function CheckoutForm() {
       return;
     }
 
-    const shippingAddress: OrderDetailsType = {
+    const shippingAddressPayload: ShippingAddressDetails = {
       name: data.name,
       email: data.email,
       phone: data.phone,
@@ -90,8 +112,8 @@ export default function CheckoutForm() {
       postalCode: data.postalCode,
     };
 
-    const paymentDetails: PaymentDetails = {
-      cardNumber: data.cardNumber, // Still simulated
+    const paymentDetailsPayload: PaymentDetails = {
+      cardNumber: data.cardNumber, 
       expiryDate: data.expiryDate,
       cvv: data.cvv,
     };
@@ -100,15 +122,27 @@ export default function CheckoutForm() {
       userId: user.uid,
       items: cartItems,
       totalAmount: getCartTotal(),
-      shippingAddress,
-      paymentDetails,
+      shippingAddress: shippingAddressPayload,
+      paymentDetails: paymentDetailsPayload,
       createdAt: serverTimestamp(),
       status: 'Pending',
     };
 
     try {
-      // In a real app, payment processing would happen here BEFORE saving the order.
-      // For this prototype, we directly save to Firestore.
+      // Save/Update shipping address in user's profile if checked
+      if (data.saveAddress && user) {
+        const userRef = doc(db, "users", user.uid);
+        await updateDoc(userRef, {
+          defaultShippingAddress: shippingAddressPayload,
+          updatedAt: serverTimestamp(),
+        });
+        await fetchUserProfile(user.uid); // Refresh profile data in context
+        toast({
+          title: "Dirección Guardada",
+          description: "Tu dirección de envío ha sido guardada para futuros pedidos.",
+          variant: "default",
+        });
+      }
       
       const docRef = await addDoc(collection(db, "orders"), orderData);
       console.log("Order submitted to Firestore with ID: ", docRef.id);
@@ -158,7 +192,7 @@ export default function CheckoutForm() {
                 <FormItem>
                   <FormLabel>Email Address</FormLabel>
                   <FormControl>
-                    <Input placeholder="john.doe@example.com" {...field} />
+                    <Input type="email" placeholder="john.doe@example.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -218,6 +252,25 @@ export default function CheckoutForm() {
               )}
             />
             </div>
+            <FormField
+              control={form.control}
+              name="saveAddress"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm mt-6">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel className="cursor-pointer">
+                      Guardar esta dirección para futuros pedidos
+                    </FormLabel>
+                  </div>
+                </FormItem>
+              )}
+            />
           </CardContent>
         </Card>
 
@@ -270,7 +323,7 @@ export default function CheckoutForm() {
           </CardContent>
         </Card>
         
-        <Button type="submit" size="lg" className="w-full bg-primary hover:bg-primary/90 text-lg py-3" disabled={form.formState.isSubmitting || !user}>
+        <Button type="submit" size="lg" className="w-full bg-primary hover:bg-primary/90 text-lg py-3" disabled={form.formState.isSubmitting || authLoading || !user}>
           {form.formState.isSubmitting ? 'Processing...' : 'Pay and Place Order'}
         </Button>
       </form>

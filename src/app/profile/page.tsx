@@ -6,16 +6,16 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign } from 'lucide-react';
+import { UserCircle, Mail, Edit3, ShieldCheck, LogOut, Package, ShoppingBag, CalendarDays, Hash, DollarSign, Home, Phone } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
-import type { Order } from '@/lib/types';
+import type { Order, UserProfile } from '@/lib/types'; // Import UserProfile
 import Image from 'next/image';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
 
 export default function ProfilePage() {
-  const { user, logout, isLoading: authIsLoading } = useAuth();
+  const { user, userProfile, logout, isLoading: authIsLoading, isLoadingUserProfile } = useAuth(); // Get userProfile
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -41,7 +41,6 @@ export default function ProfilePage() {
           setOrders(userOrders);
         } catch (error) {
           console.error("Error fetching orders: ", error);
-          // Optionally, show a toast to the user
         } finally {
           setIsLoadingOrders(false);
         }
@@ -50,7 +49,7 @@ export default function ProfilePage() {
     }
   }, [user?.uid]);
 
-  if (authIsLoading || !user) {
+  if (authIsLoading || isLoadingUserProfile || !user) { // Check isLoadingUserProfile as well
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-20rem)]">
         <p className="text-lg text-muted-foreground">Cargando perfil...</p>
@@ -77,26 +76,26 @@ export default function ProfilePage() {
       <Card className="shadow-xl mb-12">
         <CardHeader className="text-center">
           <UserCircle className="mx-auto h-24 w-24 text-primary mb-4" />
-          <CardTitle className="text-3xl font-headline">{user.displayName || user.email?.split('@')[0] || 'Mi Perfil'}</CardTitle>
+          <CardTitle className="text-3xl font-headline">{userProfile?.displayName || user.email?.split('@')[0] || 'Mi Perfil'}</CardTitle>
           <CardDescription>Gestiona la información de tu cuenta PizzaPlace.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-3">
-            {user.email && (
+            {userProfile?.email && (
               <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
                 <Mail className="h-5 w-5 text-primary" />
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Correo Electrónico</p>
-                  <p className="text-md font-semibold">{user.email}</p>
+                  <p className="text-md font-semibold">{userProfile.email}</p>
                 </div>
               </div>
             )}
-            {user.displayName && (
+            {userProfile?.displayName && (
                  <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
                     <UserCircle className="h-5 w-5 text-primary" />
                     <div>
                         <p className="text-sm font-medium text-muted-foreground">Nombre</p>
-                        <p className="text-md font-semibold">{user.displayName}</p>
+                        <p className="text-md font-semibold">{userProfile.displayName}</p>
                     </div>
                 </div>
             )}
@@ -107,11 +106,24 @@ export default function ProfilePage() {
                     <p className="text-md font-semibold break-all">{user.uid}</p>
                 </div>
             </div>
+            {userProfile?.defaultShippingAddress && (
+              <Card className="mt-4">
+                <CardHeader>
+                  <CardTitle className="text-lg font-headline flex items-center gap-2"><Home className="h-5 w-5"/> Dirección de Envío Predeterminada</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm space-y-1">
+                  <p><strong>Nombre:</strong> {userProfile.defaultShippingAddress.name}</p>
+                  <p><strong>Email:</strong> {userProfile.defaultShippingAddress.email}</p>
+                  <p><strong>Dirección:</strong> {userProfile.defaultShippingAddress.address}, {userProfile.defaultShippingAddress.city}, {userProfile.defaultShippingAddress.postalCode}</p>
+                  {userProfile.defaultShippingAddress.phone && <p><strong><Phone className="inline h-4 w-4 mr-1"/>Teléfono:</strong> {userProfile.defaultShippingAddress.phone}</p>}
+                </CardContent>
+              </Card>
+            )}
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
             <Button variant="outline" disabled>
-              <Edit3 /> Editar Perfil (Próximamente)
+              <Edit3 /> Editar Perfil y Dirección (Próximamente)
             </Button>
             <Button variant="outline" disabled>
               <ShieldCheck /> Cambiar Contraseña (Próximamente)
@@ -132,7 +144,6 @@ export default function ProfilePage() {
         {isLoadingOrders ? (
           <div className="text-center py-10">
             <p className="text-lg text-muted-foreground">Cargando tus pedidos...</p>
-            {/* You could add a spinner here */}
           </div>
         ) : orders.length === 0 ? (
           <div className="text-center py-10">
@@ -218,3 +229,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

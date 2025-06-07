@@ -15,8 +15,8 @@ export interface CartItem extends Product {
 
 // Renamed from OrderDetails to ShippingAddressDetails for clarity
 export interface ShippingAddressDetails {
-  name: string;
-  email: string;
+  name: string; // Name on the shipping address, might be different from account name
+  email: string; // Email for shipping confirmation, might be different
   address: string;
   city: string;
   postalCode: string;
@@ -41,7 +41,7 @@ export interface UserProfile {
   uid: string;
   email: string | null;
   displayName?: string | null;
-  defaultShippingAddress?: ShippingAddressDetails | null; // To be populated/edited by the user
+  defaultShippingAddress?: ShippingAddressDetails | null; 
   createdAt: any; // Firestore Timestamp
   updatedAt: any; // Firestore Timestamp
 }
@@ -58,3 +58,4 @@ export interface Order {
   createdAt: any; // Firestore Timestamp
   status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
 }
+
