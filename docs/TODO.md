@@ -1,4 +1,5 @@
 
+
 # Lista de Tareas Pendientes (TODO)
 
 Este documento rastrea las características y mejoras planificadas para PizzaPlace.
@@ -32,6 +33,7 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
     - [ ] Enviar correo de verificación al registrarse.
     - [ ] Mostrar estado de verificación en el perfil y restringir ciertas acciones si no está verificado.
 - [ ] **Historial de Pedidos:**
+    - [x] Guardar pedidos en Firestore al completar el checkout (En Progreso)
     - [ ] Página para que los usuarios vean sus pedidos anteriores (requiere backend o Firestore).
     - [ ] Detalles de cada pedido.
 - [ ] **Panel de Administración:**
@@ -62,17 +64,17 @@ Este documento rastrea las características y mejoras planificadas para PizzaPla
     - [ ] Pruebas de integración para flujos críticos (ej. proceso de compra).
     - [ ] Pruebas E2E (End-to-End) para simular la interacción del usuario.
 - [ ] **Optimización de Rendimiento:**
-    - [ ] Revisión y optimización de la carga de imágenes.
-    - [ ] Code splitting y lazy loading donde sea aplicable.
-    - [ ] Monitorización del rendimiento (Lighthouse, Web Vitals).
+    *   [ ] Revisión y optimización de la carga de imágenes.
+    *   [ ] Code splitting y lazy loading donde sea aplicable.
+    *   [ ] Monitorización del rendimiento (Lighthouse, Web Vitals).
 - [ ] **Mejoras de Accesibilidad (A11y):**
-    - [ ] Auditoría completa de accesibilidad.
-    - [ ] Asegurar el cumplimiento de WCAG AA.
+    *   [ ] Auditoría completa de accesibilidad.
+    *   [ ] Asegurar el cumplimiento de WCAG AA.
 - [ ] **Configuración de CI/CD:**
-    - [ ] Pipeline para compilación, pruebas y despliegue automáticos.
+    *   [ ] Pipeline para compilación, pruebas y despliegue automáticos.
 - [ ] **Manejo de Errores Avanzado:**
-    - [ ] Página 404 personalizada.
-    - [ ] Mejora de los mensajes de error para el usuario.
+    *   [ ] Página 404 personalizada.
+    *   [ ] Mejora de los mensajes de error para el usuario.
 - [ ] **Sección de "Ofertas Especiales" o "Promociones".**
 - [ ] **Posibilidad de personalizar pizzas (ingredientes extra/quitados).**
 - [ ] **Notificaciones Push (opcional) para actualizaciones de pedidos.**

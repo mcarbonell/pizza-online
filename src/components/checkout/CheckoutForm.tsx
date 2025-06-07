@@ -15,10 +15,15 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreditCard, User, Mail, Home, Phone } from 'lucide-react';
+import { CreditCard, User as UserIcon, Mail, Home, Phone } from 'lucide-react'; // Renamed User to UserIcon
+import { db } from "@/lib/firebase"; // Import Firestore instance
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"; // Import Firestore functions
+import type { OrderDetails as OrderDetailsType, PaymentDetails, Order } from "@/lib/types";
+
 
 const addressSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -45,7 +50,8 @@ const checkoutFormSchema = addressSchema.merge(paymentSchema);
 type CheckoutFormValues = z.infer<typeof checkoutFormSchema>;
 
 export default function CheckoutForm() {
-  const { clearCart } = useCart();
+  const { user } = useAuth(); // Get current user
+  const { cartItems, getCartTotal, clearCart } = useCart();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -65,19 +71,63 @@ export default function CheckoutForm() {
   });
 
   async function onSubmit(data: CheckoutFormValues) {
-    // In a real app, this would submit to a backend API for order processing and payment.
-    console.log("Order submitted:", data);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to place an order.",
+        variant: "destructive",
+      });
+      router.push('/login?redirect=/checkout');
+      return;
+    }
 
-    toast({
-      title: "Order Placed Successfully!",
-      description: "Thank you for your order. We'll start preparing it right away!",
-      variant: "default",
-    });
-    clearCart();
-    router.push('/');
+    const shippingAddress: OrderDetailsType = {
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      address: data.address,
+      city: data.city,
+      postalCode: data.postalCode,
+    };
+
+    const paymentDetails: PaymentDetails = {
+      cardNumber: data.cardNumber, // Still simulated
+      expiryDate: data.expiryDate,
+      cvv: data.cvv,
+    };
+
+    const orderData: Omit<Order, 'id'> = {
+      userId: user.uid,
+      items: cartItems,
+      totalAmount: getCartTotal(),
+      shippingAddress,
+      paymentDetails,
+      createdAt: serverTimestamp(),
+      status: 'Pending',
+    };
+
+    try {
+      // In a real app, payment processing would happen here BEFORE saving the order.
+      // For this prototype, we directly save to Firestore.
+      
+      const docRef = await addDoc(collection(db, "orders"), orderData);
+      console.log("Order submitted to Firestore with ID: ", docRef.id);
+
+      toast({
+        title: "Order Placed Successfully!",
+        description: "Thank you for your order. We'll start preparing it right away!",
+        variant: "default",
+      });
+      clearCart();
+      router.push('/');
+    } catch (error) {
+      console.error("Error placing order: ", error);
+      toast({
+        title: "Error Placing Order",
+        description: "There was a problem submitting your order. Please try again.",
+        variant: "destructive",
+      });
+    }
   }
 
   return (
@@ -85,7 +135,7 @@ export default function CheckoutForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-2xl flex items-center gap-2"><User /> Contact & Delivery Information</CardTitle>
+            <CardTitle className="font-headline text-2xl flex items-center gap-2"><UserIcon /> Contact & Delivery Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <FormField
@@ -173,7 +223,7 @@ export default function CheckoutForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-2xl flex items-center gap-2"><CreditCard /> Payment Details</CardTitle>
+            <CardTitle className="font-headline text-2xl flex items-center gap-2"><CreditCard /> Payment Details (Simulated)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
           <FormField
@@ -220,7 +270,7 @@ export default function CheckoutForm() {
           </CardContent>
         </Card>
         
-        <Button type="submit" size="lg" className="w-full bg-primary hover:bg-primary/90 text-lg py-3" disabled={form.formState.isSubmitting}>
+        <Button type="submit" size="lg" className="w-full bg-primary hover:bg-primary/90 text-lg py-3" disabled={form.formState.isSubmitting || !user}>
           {form.formState.isSubmitting ? 'Processing...' : 'Pay and Place Order'}
         </Button>
       </form>

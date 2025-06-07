@@ -23,7 +23,7 @@ export interface OrderDetails {
 }
 
 export interface PaymentDetails {
-  cardNumber: string;
+  cardNumber: string; // Keep as string for formatting
   expiryDate: string; // MM/YY
   cvv: string;
 }
@@ -36,3 +36,14 @@ export interface User {
   // You can add other Firebase user properties if needed, e.g., photoURL
 }
 
+// New Order interface
+export interface Order {
+  id?: string; // Firestore document ID, will be auto-generated
+  userId: string;
+  items: CartItem[];
+  totalAmount: number;
+  shippingAddress: OrderDetails;
+  paymentDetails: PaymentDetails; // Still simulated
+  createdAt: any; // Firestore Timestamp (will be serverTimestamp())
+  status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled'; // Example statuses
+}
