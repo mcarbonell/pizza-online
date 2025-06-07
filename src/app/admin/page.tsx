@@ -8,9 +8,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, orderBy, writeBatch, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, writeBatch, doc } from 'firebase/firestore'; // Added doc
 import type { Product } from '@/lib/types';
-import { initialProductData } from '@/data/products'; // Import new initial data
+import { initialProductData } from '@/data/products'; 
 import { useToast } from '@/hooks/use-toast';
 
 import {
@@ -260,3 +260,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
