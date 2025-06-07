@@ -32,7 +32,7 @@ export default function HomePage() {
         setProducts(productsData);
       } catch (err) {
         console.error("Error fetching products:", err);
-        setError("Failed to load products. Please try again later.");
+        setError("No se pudieron cargar los productos. Por favor, inténtalo de nuevo más tarde.");
       } finally {
         setIsLoading(false);
       }
@@ -87,10 +87,10 @@ export default function HomePage() {
     <div className="relative">
       <div className="py-8">
         <h1 className="text-5xl font-headline mb-12 text-center text-primary drop-shadow-sm">
-          Welcome to PizzaPlace!
+          ¡Bienvenido a Pizzería Serranillo!
         </h1>
         <p className="text-xl font-body text-center mb-12 text-foreground/80 max-w-2xl mx-auto">
-          Indulge in our delicious, freshly made pizzas, savory sides, refreshing drinks, and delightful desserts. Order now for an unforgettable taste experience!
+          Disfruta de nuestras deliciosas pizzas recién hechas, sabrosos acompañamientos, bebidas refrescantes y postres encantadores. ¡Haz tu pedido ahora para una experiencia de sabor inolvidable!
         </p>
 
         {error && (
@@ -104,18 +104,18 @@ export default function HomePage() {
         {!isLoading && products.length === 0 && !error && (
             <Alert className="mb-8">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>No Products Available</AlertTitle>
+                <AlertTitle>No Hay Productos Disponibles</AlertTitle>
                 <AlertDescription>
-                    It seems there are no products on the menu right now. Please check back later!
-                    If you are an admin, please add products to the 'products' collection in Firestore.
+                    Parece que no hay productos en el menú en este momento. ¡Por favor, vuelve más tarde!
+                    Si eres administrador, añade productos a la colección 'products' en Firestore.
                 </AlertDescription>
             </Alert>
         )}
 
-        {renderProductSection("Our Famous Pizzas", pizzaProducts)}
-        {renderProductSection("Scrumptious Sides", sideProducts)}
-        {renderProductSection("Cool Drinks", drinkProducts)}
-        {renderProductSection("Sweet Desserts", dessertProducts)}
+        {renderProductSection("Nuestras Famosas Pizzas", pizzaProducts)}
+        {renderProductSection("Acompañamientos Deliciosos", sideProducts)}
+        {renderProductSection("Bebidas Refrescantes", drinkProducts)}
+        {renderProductSection("Postres Dulces", dessertProducts)}
       </div>
       <CartSidebar />
     </div>

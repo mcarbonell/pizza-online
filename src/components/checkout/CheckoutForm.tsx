@@ -26,12 +26,12 @@ import { useEffect, useState } from "react";
 import { getStripe } from "@/lib/stripe"; // Import Stripe loader
 
 const addressSchema = z.object({
-  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-  email: z.string().email({ message: "Please enter a valid email address." }),
+  name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
+  email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
   phone: z.string().optional(),
-  address: z.string().min(5, { message: "Address must be at least 5 characters." }),
-  city: z.string().min(2, { message: "City must be at least 2 characters." }),
-  postalCode: z.string().min(3, { message: "Postal code is too short." }),
+  address: z.string().min(5, { message: "La dirección debe tener al menos 5 caracteres." }),
+  city: z.string().min(2, { message: "La ciudad debe tener al menos 2 caracteres." }),
+  postalCode: z.string().min(3, { message: "El código postal es demasiado corto." }),
 });
 
 const checkoutFormSchema = addressSchema.extend({
@@ -90,7 +90,7 @@ export default function CheckoutForm() {
     if (!user) {
       toast({
         title: "Error",
-        description: "You must be logged in to place an order.",
+        description: "Debes iniciar sesión para realizar un pedido.",
         variant: "destructive",
       });
       router.push('/login?redirect=/checkout');
@@ -100,7 +100,7 @@ export default function CheckoutForm() {
     if (cartItems.length === 0) {
       toast({
         title: "Error",
-        description: "Your cart is empty.",
+        description: "Tu carrito está vacío.",
         variant: "destructive",
       });
       return;
@@ -157,13 +157,13 @@ export default function CheckoutForm() {
       const sessionData = await response.json();
 
       if (!response.ok) {
-        throw new Error(sessionData.error || 'Failed to create Stripe session.');
+        throw new Error(sessionData.error || 'No se pudo crear la sesión de Stripe.');
       }
 
       // 3. Redirect to Stripe Checkout
       const stripe = await getStripe();
       if (!stripe) {
-        throw new Error('Stripe.js has not loaded yet.');
+        throw new Error('Stripe.js aún no se ha cargado.');
       }
 
       const { error } = await stripe.redirectToCheckout({
@@ -171,7 +171,7 @@ export default function CheckoutForm() {
       });
 
       if (error) {
-        console.error('Stripe redirect error:', error);
+        console.error('Error de redirección de Stripe:', error);
         toast({
           title: "Error de Redirección a Stripe",
           description: error.message || "No se pudo redirigir a la página de pago.",
@@ -183,7 +183,7 @@ export default function CheckoutForm() {
       // Order creation will be handled by the webhook.
 
     } catch (error: any) {
-      console.error("Error processing payment: ", error);
+      console.error("Error procesando el pago: ", error);
       toast({
         title: "Error al Procesar el Pago",
         description: error.message || "Hubo un problema. Por favor, inténtalo de nuevo.",
@@ -200,7 +200,7 @@ export default function CheckoutForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-2xl flex items-center gap-2"><UserIcon /> Contact & Delivery Information</CardTitle>
+            <CardTitle className="font-headline text-2xl flex items-center gap-2"><UserIcon /> Información de Contacto y Entrega</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <FormField
@@ -208,9 +208,9 @@ export default function CheckoutForm() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Full Name</FormLabel>
+                  <FormLabel>Nombre Completo</FormLabel>
                   <FormControl>
-                    <Input placeholder="John Doe" {...field} />
+                    <Input placeholder="Juan Pérez" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -221,9 +221,9 @@ export default function CheckoutForm() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email Address</FormLabel>
+                  <FormLabel>Correo Electrónico</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="john.doe@example.com" {...field} />
+                    <Input type="email" placeholder="juan.perez@ejemplo.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -234,9 +234,9 @@ export default function CheckoutForm() {
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Phone Number (Optional)</FormLabel>
+                  <FormLabel>Número de Teléfono (Opcional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="123-456-7890" {...field} />
+                    <Input placeholder="600 123 456" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -247,9 +247,9 @@ export default function CheckoutForm() {
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Street Address</FormLabel>
+                  <FormLabel>Dirección (Calle y Número)</FormLabel>
                   <FormControl>
-                    <Input placeholder="123 Pizza Lane" {...field} />
+                    <Input placeholder="C/ Falsa, 123" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -261,9 +261,9 @@ export default function CheckoutForm() {
               name="city"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>City</FormLabel>
+                  <FormLabel>Ciudad</FormLabel>
                   <FormControl>
-                    <Input placeholder="Pizzaville" {...field} />
+                    <Input placeholder="Pizzalandia" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -274,9 +274,9 @@ export default function CheckoutForm() {
               name="postalCode"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Postal Code</FormLabel>
+                  <FormLabel>Código Postal</FormLabel>
                   <FormControl>
-                    <Input placeholder="12345" {...field} />
+                    <Input placeholder="28080" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -324,4 +324,3 @@ export default function CheckoutForm() {
     </Form>
   );
 }
-

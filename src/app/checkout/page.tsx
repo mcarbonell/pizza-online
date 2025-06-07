@@ -48,11 +48,11 @@ export default function CheckoutPage() {
   if (totalItems === 0 && typeof window !== 'undefined') {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <h1 className="text-3xl font-headline mb-4">Your Cart is Empty</h1>
-        <p className="text-muted-foreground mb-8">Please add some items to your cart before proceeding to checkout.</p>
+        <h1 className="text-3xl font-headline mb-4">Tu Carrito está Vacío</h1>
+        <p className="text-muted-foreground mb-8">Por favor, añade algunos productos a tu carrito antes de proceder al pago.</p>
         <Button asChild>
           <Link href="/">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Go Back to Menu
+            <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Menú
           </Link>
         </Button>
       </div>
@@ -62,7 +62,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="container mx-auto py-8 px-4">
-      <h1 className="text-4xl font-headline mb-10 text-center text-primary">Checkout</h1>
+      <h1 className="text-4xl font-headline mb-10 text-center text-primary">Proceso de Pago</h1>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <CheckoutForm />
@@ -70,8 +70,8 @@ export default function CheckoutPage() {
         <div className="lg:col-span-1">
           <Card className="sticky top-24">
             <CardHeader>
-              <CardTitle className="font-headline text-2xl">Order Summary</CardTitle>
-              <CardDescription>{totalItems} item(s) in your cart</CardDescription>
+              <CardTitle className="font-headline text-2xl">Resumen del Pedido</CardTitle>
+              <CardDescription>{totalItems} {totalItems === 1 ? 'artículo' : 'artículos'} en tu carrito</CardDescription>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] pr-4">
@@ -88,7 +88,7 @@ export default function CheckoutPage() {
                       />
                       <div>
                         <p className="font-semibold text-sm">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                        <p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p>
                       </div>
                     </div>
                     <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p>

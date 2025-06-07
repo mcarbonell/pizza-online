@@ -20,8 +20,8 @@ export default function ProductCard({ product }: ProductCardProps) {
   const handleAddToCart = () => {
     addToCart(product);
     toast({
-      title: `${product.name} added to cart!`,
-      description: "You can view your cart or continue shopping.",
+      title: `¡${product.name} añadido al carrito!`,
+      description: "Puedes ver tu carrito o seguir comprando.",
     });
   };
 
@@ -45,7 +45,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         <p className="text-xl font-bold text-primary">${product.price.toFixed(2)}</p>
         <Button variant="default" onClick={handleAddToCart} className="bg-accent hover:bg-accent/90 text-accent-foreground">
           <PlusCircle className="mr-2 h-5 w-5" />
-          Add to Cart
+          Añadir al Carrito
         </Button>
       </CardFooter>
     </Card>
