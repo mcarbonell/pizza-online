@@ -53,6 +53,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const productCategories = ['Pizzas', 'Sides', 'Drinks', 'Desserts'] as const;
 const orderStatuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'] as const;
@@ -366,66 +367,119 @@ export default function AdminPage() {
   return (
     <div className="container mx-auto py-12 px-4 space-y-12">
       <Card className="shadow-xl">
-        <CardHeader className="border-b pb-4"><div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"><div><CardTitle className="text-3xl font-headline flex items-center gap-2"><LayoutDashboard /> Panel Admin</CardTitle><CardDescription>Gestiona productos, pedidos y usuarios.</CardDescription></div><div className="flex gap-2"><AlertDialog><AlertDialogTrigger asChild><Button variant="outline" disabled={isAnyActionInProgress}><UploadCloud />Importar Menú</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Confirmar Importación?</AlertDialogTitle><AlertDialogDescription>Añadirá productos iniciales. No borrará existentes.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isImporting}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleImportInitialMenu} disabled={isImporting}>{isImporting && <Loader2 className="animate-spin"/>}Confirmar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><Button onClick={handleOpenAddModal} disabled={isAnyActionInProgress}><PackagePlus />Añadir Producto</Button></div></div></CardHeader>
+        <CardHeader className="border-b pb-4">
+          <CardTitle className="text-3xl font-headline flex items-center gap-2"><LayoutDashboard /> Panel Admin</CardTitle>
+          <CardDescription>Gestiona productos, pedidos y usuarios.</CardDescription>
+        </CardHeader>
         <CardContent className="pt-6">
-          <h2 className="text-2xl font-headline mb-6 flex items-center gap-2"><ShoppingBasket />Lista de Productos</h2>
-          {isLoadingProducts ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando...</div>)
-          : productError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{productError}</AlertDescription></Alert>)
-          : products.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Productos</AlertTitle><AlertDescription>Usa "Importar Menú" o "Añadir Producto".</AlertDescription></Alert>)
-          : (<div className="overflow-x-auto"><Table><TableCaption>Productos en Firestore.</TableCaption><TableHeader><TableRow><TableHead>Imagen</TableHead><TableHead>Nombre</TableHead><TableHead className="hidden md:table-cell">Categoría</TableHead><TableHead className="hidden lg:table-cell max-w-[300px] truncate">Descripción</TableHead><TableHead className="text-right">Precio</TableHead><TableHead className="text-center">Acciones</TableHead></TableRow></TableHeader>
-              <TableBody>{products.map((p) => (<TableRow key={p.id}><TableCell><Image src={p.imageUrl || DEFAULT_PLACEHOLDER_IMAGE} alt={p.name} width={48} height={48} className="rounded object-cover" data-ai-hint={p.dataAiHint}/></TableCell><TableCell className="font-medium">{p.name}</TableCell><TableCell className="hidden md:table-cell"><Badge variant="secondary">{p.category}</Badge></TableCell><TableCell className="hidden lg:table-cell text-xs max-w-[300px] truncate" title={p.description}>{p.description}</TableCell><TableCell className="text-right">€{p.price.toFixed(2)}</TableCell><TableCell className="text-center"><div className="flex justify-center gap-1 sm:gap-2"><Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenEditModal(p)} disabled={isAnyActionInProgress}><Edit /></Button><Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleOpenDeleteAlert(p)} disabled={isAnyActionInProgress}><Trash2 /></Button></div></TableCell></TableRow>))}</TableBody>
-            </Table></div>)}
-        </CardContent>
-        <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión CRUD de productos.</p></CardFooter>
-      </Card>
+          <Tabs defaultValue="products" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsTrigger value="products"><ShoppingBasket className="mr-2 h-5 w-5"/>Productos</TabsTrigger>
+              <TabsTrigger value="orders"><ClipboardList className="mr-2 h-5 w-5"/>Pedidos</TabsTrigger>
+              <TabsTrigger value="users"><Users className="mr-2 h-5 w-5"/>Usuarios</TabsTrigger>
+            </TabsList>
 
-      <Card className="shadow-xl">
-        <CardHeader className="border-b pb-4"><div className="flex justify-between items-center"><CardTitle className="text-3xl font-headline flex items-center gap-2"><ClipboardList /> Pedidos Recibidos</CardTitle><Button variant="outline" size="sm" onClick={fetchOrders} disabled={isLoadingOrders || isAnyActionInProgress}><RefreshCcw className={isLoadingOrders ? "animate-spin" : ""} /> Refrescar</Button></div></CardHeader>
-        <CardContent className="pt-6">
-          {isLoadingOrders ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando pedidos...</div>)
-          : orderError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{orderError}</AlertDescription></Alert>)
-          : orders.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Pedidos</AlertTitle><AlertDescription>Aún no se han realizado pedidos.</AlertDescription></Alert>)
-          : (<div className="overflow-x-auto"><Table><TableCaption>Pedidos registrados en Firestore.</TableCaption><TableHeader><TableRow><TableHead>ID Pedido</TableHead><TableHead>Fecha</TableHead><TableHead>Cliente (Email)</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-center">Estado</TableHead></TableRow></TableHeader>
-              <TableBody>{orders.map((order) => (<TableRow key={order.id}><TableCell className="font-mono text-xs">{order.id?.substring(0,8)}...</TableCell><TableCell>{formatDate(order.createdAt)}</TableCell><TableCell>{order.shippingAddress.email}</TableCell><TableCell className="text-right">€{order.totalAmount.toFixed(2)}</TableCell><TableCell className="text-center">
-                <Select value={order.status} onValueChange={(newStatus) => handleUpdateOrderStatus(order.id!, newStatus as typeof orderStatuses[number])} disabled={isAnyActionInProgress}>
-                    <SelectTrigger className="w-[150px] h-9 text-xs"><SelectValue placeholder="Cambiar estado" /></SelectTrigger>
-                    <SelectContent>{orderStatuses.map(status => (<SelectItem key={status} value={status} className="text-xs">{status}</SelectItem>))}</SelectContent>
-                </Select>
-              </TableCell></TableRow>))}</TableBody>
-            </Table></div>)}
-        </CardContent>
-         <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión de estados de pedidos.</p></CardFooter>
-      </Card>
+            <TabsContent value="products">
+              <Card>
+                <CardHeader className="border-b">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <CardTitle className="text-2xl font-headline flex items-center gap-2"><ShoppingBasket />Gestión de Productos</CardTitle>
+                      <CardDescription>Añade, edita o elimina productos del menú.</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" disabled={isAnyActionInProgress}><UploadCloud />Importar Menú</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader><AlertDialogTitle>¿Confirmar Importación?</AlertDialogTitle><AlertDialogDescription>Añadirá productos iniciales. No borrará existentes.</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isImporting}>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleImportInitialMenu} disabled={isImporting}>{isImporting && <Loader2 className="animate-spin"/>}Confirmar</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      <Button onClick={handleOpenAddModal} disabled={isAnyActionInProgress}><PackagePlus />Añadir Producto</Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {isLoadingProducts ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando...</div>)
+                  : productError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{productError}</AlertDescription></Alert>)
+                  : products.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Productos</AlertTitle><AlertDescription>Usa "Importar Menú" o "Añadir Producto".</AlertDescription></Alert>)
+                  : (<div className="overflow-x-auto"><Table><TableCaption>Productos en Firestore.</TableCaption><TableHeader><TableRow><TableHead>Imagen</TableHead><TableHead>Nombre</TableHead><TableHead className="hidden md:table-cell">Categoría</TableHead><TableHead className="hidden lg:table-cell max-w-[300px] truncate">Descripción</TableHead><TableHead className="text-right">Precio</TableHead><TableHead className="text-center">Acciones</TableHead></TableRow></TableHeader>
+                      <TableBody>{products.map((p) => (<TableRow key={p.id}><TableCell><Image src={p.imageUrl || DEFAULT_PLACEHOLDER_IMAGE} alt={p.name} width={48} height={48} className="rounded object-cover" data-ai-hint={p.dataAiHint}/></TableCell><TableCell className="font-medium">{p.name}</TableCell><TableCell className="hidden md:table-cell"><Badge variant="secondary">{p.category}</Badge></TableCell><TableCell className="hidden lg:table-cell text-xs max-w-[300px] truncate" title={p.description}>{p.description}</TableCell><TableCell className="text-right">€{p.price.toFixed(2)}</TableCell><TableCell className="text-center"><div className="flex justify-center gap-1 sm:gap-2"><Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenEditModal(p)} disabled={isAnyActionInProgress}><Edit /></Button><Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleOpenDeleteAlert(p)} disabled={isAnyActionInProgress}><Trash2 /></Button></div></TableCell></TableRow>))}</TableBody>
+                    </Table></div>)}
+                </CardContent>
+                <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión CRUD de productos.</p></CardFooter>
+              </Card>
+            </TabsContent>
 
-      <Card className="shadow-xl">
-        <CardHeader className="border-b pb-4"><div className="flex justify-between items-center"><CardTitle className="text-3xl font-headline flex items-center gap-2"><Users /> Gestión de Usuarios</CardTitle><Button variant="outline" size="sm" onClick={fetchUsers} disabled={isLoadingUsers || isAnyActionInProgress}><RefreshCcw className={isLoadingUsers ? "animate-spin" : ""} /> Refrescar</Button></div></CardHeader>
-        <CardContent className="pt-6">
-          {isLoadingUsers ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando usuarios...</div>)
-          : userManagementError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{userManagementError}</AlertDescription></Alert>)
-          : allUsers.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Usuarios</AlertTitle><AlertDescription>No hay usuarios registrados.</AlertDescription></Alert>)
-          : (<div className="overflow-x-auto"><Table><TableCaption>Usuarios registrados en Firestore.</TableCaption><TableHeader><TableRow><TableHead>Email</TableHead><TableHead>Nombre</TableHead><TableHead className="text-center">Rol</TableHead></TableRow></TableHeader>
-              <TableBody>{allUsers.map((u) => (<TableRow key={u.uid}><TableCell className="font-medium">{u.email}</TableCell><TableCell>{u.displayName || 'N/A'}</TableCell><TableCell className="text-center">
-                <Select 
-                  value={u.role || 'user'} 
-                  onValueChange={(newRole) => handleUpdateUserRole(u.uid, newRole as typeof userRoles[number])} 
-                  disabled={isAnyActionInProgress || u.uid === user?.uid}
-                >
-                    <SelectTrigger className="w-[120px] h-9 text-xs mx-auto">
-                        <SelectValue placeholder="Cambiar rol">
-                            {u.role === 'admin' ? <UserCog className="inline mr-1.5 h-3.5 w-3.5" /> : <UserCheck className="inline mr-1.5 h-3.5 w-3.5" />}
-                            {u.role}
-                        </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>{userRoles.map(role => (<SelectItem key={role} value={role} className="text-xs">
-                        {role === 'admin' ? <UserCog className="inline mr-1.5 h-3.5 w-3.5" /> : <UserCheck className="inline mr-1.5 h-3.5 w-3.5" />}
-                        {role}
-                    </SelectItem>))}</SelectContent>
-                </Select>
-                {u.uid === user?.uid && <p className="text-xs text-muted-foreground mt-1">(Tu cuenta)</p>}
-              </TableCell></TableRow>))}</TableBody>
-            </Table></div>)}
+            <TabsContent value="orders">
+              <Card>
+                <CardHeader className="border-b">
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-2xl font-headline flex items-center gap-2"><ClipboardList /> Pedidos Recibidos</CardTitle>
+                    <Button variant="outline" size="sm" onClick={fetchOrders} disabled={isLoadingOrders || isAnyActionInProgress}><RefreshCcw className={isLoadingOrders ? "animate-spin" : ""} /> Refrescar</Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {isLoadingOrders ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando pedidos...</div>)
+                  : orderError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{orderError}</AlertDescription></Alert>)
+                  : orders.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Pedidos</AlertTitle><AlertDescription>Aún no se han realizado pedidos.</AlertDescription></Alert>)
+                  : (<div className="overflow-x-auto"><Table><TableCaption>Pedidos registrados en Firestore.</TableCaption><TableHeader><TableRow><TableHead>ID Pedido</TableHead><TableHead>Fecha</TableHead><TableHead>Cliente (Email)</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-center">Estado</TableHead></TableRow></TableHeader>
+                      <TableBody>{orders.map((order) => (<TableRow key={order.id}><TableCell className="font-mono text-xs">{order.id?.substring(0,8)}...</TableCell><TableCell>{formatDate(order.createdAt)}</TableCell><TableCell>{order.shippingAddress.email}</TableCell><TableCell className="text-right">€{order.totalAmount.toFixed(2)}</TableCell><TableCell className="text-center">
+                        <Select value={order.status} onValueChange={(newStatus) => handleUpdateOrderStatus(order.id!, newStatus as typeof orderStatuses[number])} disabled={isAnyActionInProgress}>
+                            <SelectTrigger className="w-[150px] h-9 text-xs"><SelectValue placeholder="Cambiar estado" /></SelectTrigger>
+                            <SelectContent>{orderStatuses.map(status => (<SelectItem key={status} value={status} className="text-xs">{status}</SelectItem>))}</SelectContent>
+                        </Select>
+                      </TableCell></TableRow>))}</TableBody>
+                    </Table></div>)}
+                </CardContent>
+                <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión de estados de pedidos.</p></CardFooter>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="users">
+              <Card>
+                <CardHeader className="border-b">
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-2xl font-headline flex items-center gap-2"><Users /> Gestión de Usuarios</CardTitle>
+                    <Button variant="outline" size="sm" onClick={fetchUsers} disabled={isLoadingUsers || isAnyActionInProgress}><RefreshCcw className={isLoadingUsers ? "animate-spin" : ""} /> Refrescar</Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {isLoadingUsers ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando usuarios...</div>)
+                  : userManagementError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{userManagementError}</AlertDescription></Alert>)
+                  : allUsers.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Usuarios</AlertTitle><AlertDescription>No hay usuarios registrados.</AlertDescription></Alert>)
+                  : (<div className="overflow-x-auto"><Table><TableCaption>Usuarios registrados en Firestore.</TableCaption><TableHeader><TableRow><TableHead>Email</TableHead><TableHead>Nombre</TableHead><TableHead className="text-center">Rol</TableHead></TableRow></TableHeader>
+                      <TableBody>{allUsers.map((u) => (<TableRow key={u.uid}><TableCell className="font-medium">{u.email}</TableCell><TableCell>{u.displayName || 'N/A'}</TableCell><TableCell className="text-center">
+                        <Select 
+                          value={u.role || 'user'} 
+                          onValueChange={(newRole) => handleUpdateUserRole(u.uid, newRole as typeof userRoles[number])} 
+                          disabled={isAnyActionInProgress || u.uid === user?.uid}
+                        >
+                            <SelectTrigger className="w-[120px] h-9 text-xs mx-auto">
+                                <SelectValue placeholder="Cambiar rol">
+                                    {u.role === 'admin' ? <UserCog className="inline mr-1.5 h-3.5 w-3.5" /> : <UserCheck className="inline mr-1.5 h-3.5 w-3.5" />}
+                                    {u.role}
+                                </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>{userRoles.map(role => (<SelectItem key={role} value={role} className="text-xs">
+                                {role === 'admin' ? <UserCog className="inline mr-1.5 h-3.5 w-3.5" /> : <UserCheck className="inline mr-1.5 h-3.5 w-3.5" />}
+                                {role}
+                            </SelectItem>))}</SelectContent>
+                        </Select>
+                        {u.uid === user?.uid && <p className="text-xs text-muted-foreground mt-1">(Tu cuenta)</p>}
+                      </TableCell></TableRow>))}</TableBody>
+                    </Table></div>)}
+                </CardContent>
+                <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión de roles de usuarios.</p></CardFooter>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </CardContent>
-        <CardFooter className="border-t pt-4"><p className="text-xs text-muted-foreground">Gestión de roles de usuarios.</p></CardFooter>
       </Card>
 
 
