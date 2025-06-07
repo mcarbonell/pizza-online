@@ -13,7 +13,8 @@ export interface CartItem extends Product {
   quantity: number;
 }
 
-export interface OrderDetails {
+// Renamed from OrderDetails to ShippingAddressDetails for clarity
+export interface ShippingAddressDetails {
   name: string;
   email: string;
   address: string;
@@ -28,22 +29,32 @@ export interface PaymentDetails {
   cvv: string;
 }
 
-// Updated User type to align better with Firebase User
+// User type for Firebase Auth data
 export interface User {
   uid: string;         // Firebase User ID
   email: string | null; // Firebase User email
   displayName?: string | null; // Firebase User display name
-  // You can add other Firebase user properties if needed, e.g., photoURL
 }
 
-// New Order interface
+// New UserProfile type for Firestore "users" collection
+export interface UserProfile {
+  uid: string;
+  email: string | null;
+  displayName?: string | null;
+  defaultShippingAddress?: ShippingAddressDetails | null; // To be populated/edited by the user
+  createdAt: any; // Firestore Timestamp
+  updatedAt: any; // Firestore Timestamp
+}
+
+
+// Order interface
 export interface Order {
-  id?: string; // Firestore document ID, will be auto-generated when creating, populated when fetching
+  id?: string; // Firestore document ID
   userId: string;
   items: CartItem[];
   totalAmount: number;
-  shippingAddress: OrderDetails;
+  shippingAddress: ShippingAddressDetails; // Uses the renamed type
   paymentDetails: PaymentDetails; // Still simulated
-  createdAt: any; // Firestore Timestamp (will be serverTimestamp() when creating, Timestamp when fetching)
-  status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled'; // Example statuses
+  createdAt: any; // Firestore Timestamp
+  status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
 }
