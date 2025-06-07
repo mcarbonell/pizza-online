@@ -41,8 +41,15 @@ const checkoutFormSchema = addressSchema.extend({
 type CheckoutFormValues = z.infer<typeof checkoutFormSchema>;
 
 export default function CheckoutForm() {
-  const { user, userProfile, fetchUserProfile, isLoading: authLoading, isLoadingUserProfile } = useAuth();
-  const { cartItems, getCartTotal } = useCart(); // Removed clearCart for now, will be handled by webhook
+  const { 
+    user, 
+    userProfile, 
+    fetchUserProfile, 
+    isLoading: authLoading, 
+    isLoadingUserProfile,
+    updateUserProfileDetails // Already available here
+  } = useAuth();
+  const { cartItems, getCartTotal } = useCart();
   const { toast } = useToast();
   const router = useRouter();
   const [isFormPreFilled, setIsFormPreFilled] = useState(false);
@@ -112,12 +119,12 @@ export default function CheckoutForm() {
 
     try {
       // 1. Save address preference if selected (optional, can be done via webhook too)
-      if (data.saveAddress && userProfile) {
+      if (data.saveAddress && userProfile && user) { // Added user check for fetchUserProfile
          if (JSON.stringify(userProfile.defaultShippingAddress) !== JSON.stringify(shippingAddressPayload)) {
             // Only update if it's different or new
             // This is a simplified update, a more robust one would be in AuthContext
-            const { updateUserProfileDetails } = useAuth(); // Assuming this is okay to call here
-            await updateUserProfileDetails({
+            // const { updateUserProfileDetails } = useAuth(); // REMOVED: Incorrect hook call
+            await updateUserProfileDetails({ // USE the one from component scope
                 displayName: userProfile.displayName || '',
                 shippingName: shippingAddressPayload.name,
                 shippingEmail: shippingAddressPayload.email,
@@ -125,9 +132,8 @@ export default function CheckoutForm() {
                 shippingCity: shippingAddressPayload.city,
                 shippingPostalCode: shippingAddressPayload.postalCode,
                 shippingPhone: shippingAddressPayload.phone,
-                // payment fields are removed
             });
-            await fetchUserProfile(user.uid);
+            await fetchUserProfile(user.uid); // USE the one from component scope
             toast({
                 title: "Dirección Guardada",
                 description: "Tu dirección de envío ha sido guardada para futuros pedidos.",
@@ -318,3 +324,4 @@ export default function CheckoutForm() {
     </Form>
   );
 }
+
