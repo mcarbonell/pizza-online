@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Link from "next/link"; // Added missing import
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "La contraseña actual es requerida."),
@@ -107,9 +108,15 @@ export default function ProfilePage() {
   const editProfileForm = useForm<UpdateUserProfileFormValuesZod>({
     resolver: zodResolver(updateUserProfileSchema),
     defaultValues: {
-      displayName: "",
-      shippingName: "", shippingEmail: "", shippingAddress: "", shippingCity: "", shippingPostalCode: "", shippingPhone: "",
-      paymentLast4Digits: "", paymentExpiryDate: ""
+      displayName: userProfile?.displayName || user?.displayName || "",
+      shippingName: userProfile?.defaultShippingAddress?.name || "",
+      shippingEmail: userProfile?.defaultShippingAddress?.email || "",
+      shippingAddress: userProfile?.defaultShippingAddress?.address || "",
+      shippingCity: userProfile?.defaultShippingAddress?.city || "",
+      shippingPostalCode: userProfile?.defaultShippingAddress?.postalCode || "",
+      shippingPhone: userProfile?.defaultShippingAddress?.phone || "",
+      paymentLast4Digits: userProfile?.defaultPaymentMethod?.last4Digits || "",
+      paymentExpiryDate: userProfile?.defaultPaymentMethod?.expiryDate || "",
     },
   });
 
@@ -122,7 +129,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (userProfile && isEditProfileDialogOpen && !editProfileForm.formState.isDirty) {
       editProfileForm.reset({
-        displayName: userProfile.displayName || "",
+        displayName: userProfile.displayName || user?.displayName || "",
         shippingName: userProfile.defaultShippingAddress?.name || "",
         shippingEmail: userProfile.defaultShippingAddress?.email || "",
         shippingAddress: userProfile.defaultShippingAddress?.address || "",
@@ -133,7 +140,7 @@ export default function ProfilePage() {
         paymentExpiryDate: userProfile.defaultPaymentMethod?.expiryDate || "",
       });
     }
-  }, [userProfile, editProfileForm, isEditProfileDialogOpen]);
+  }, [userProfile, user, editProfileForm, isEditProfileDialogOpen]);
 
 
   useEffect(() => {
@@ -350,8 +357,8 @@ export default function ProfilePage() {
               <TooltipProvider>
                 <Tooltip open={!hasPasswordProvider ? undefined : false }>
                   <TooltipTrigger asChild>
-                    <span tabIndex={hasPasswordProvider ? -1 : 0}> 
-                      <Button variant="outline" disabled={!hasPasswordProvider} onClick={() => hasPasswordProvider && setIsPasswordDialogOpen(true)}>
+                    <span tabIndex={hasPasswordProvider ? -1 : 0} className="w-full"> 
+                      <Button variant="outline" disabled={!hasPasswordProvider} onClick={() => hasPasswordProvider && setIsPasswordDialogOpen(true)} className="w-full">
                         <ShieldCheck /> Cambiar Contraseña
                       </Button>
                     </span>
@@ -465,3 +472,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
