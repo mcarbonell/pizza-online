@@ -5,24 +5,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle } from "lucide-react";
 import Link from "next/link";
-import { useCart } from "@/context/CartContext"; // Keep for potential future use, but not clearing cart here
+import { useCart } from "@/context/CartContext";
 import { useEffect } from "react";
 import { useSearchParams } from 'next/navigation';
 
 
 export default function CheckoutSuccessPage() {
-  const { clearCart } = useCart(); // Get clearCart from context
+  const { clearCart } = useCart();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
 
 
   useEffect(() => {
-    // Attempt to clear the cart if a Stripe session ID is present.
-    // This is a client-side fallback. The primary order creation and cart management
-    // should ideally be handled robustly by the webhook.
     if (sessionId) {
-        console.log("Stripe session ID on success page:", sessionId, "Payment successful, attempting to clear cart.");
-        clearCart(); // Clear cart items from localStorage
+        console.log("Stripe session ID on success page:", sessionId, "Payment successful, attempting to clear cart (if webhook hasn't already).");
+        // It's generally better for the webhook to be the source of truth for clearing the cart
+        // after an order is successfully created in the DB.
+        // However, this client-side clear can act as a fallback or quicker UX update.
+        clearCart(); 
     }
   }, [sessionId, clearCart]);
 
@@ -31,7 +31,7 @@ export default function CheckoutSuccessPage() {
       <Card className="w-full max-w-lg text-center shadow-xl">
         <CardHeader>
           <CheckCircle className="mx-auto h-16 w-16 text-green-500 mb-4" />
-          <CardTitle className="text-3xl font-headline text-primary">¡Pago Exitoso!</CardTitle>
+          <CardTitle className="text-3xl font-headline text-green-600">¡Pago Exitoso!</CardTitle>
           <CardDescription className="text-lg">
             Gracias por tu pedido en PizzaPlace.
           </CardDescription>
