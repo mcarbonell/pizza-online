@@ -25,7 +25,6 @@ export default function CustomizePizzaDialog({ product, isOpen, onClose, onAddTo
 
   useEffect(() => {
     if (isOpen) {
-      // Reset selections when dialog opens for a new product (or re-opens)
       setSelectedExtras([]);
       setTotalPrice(product.price);
     }
@@ -43,7 +42,7 @@ export default function CustomizePizzaDialog({ product, isOpen, onClose, onAddTo
   };
 
   const handleSubmit = () => {
-    onAddToCart(product, selectedExtras); // Pass the base product and selected extras
+    onAddToCart(product, selectedExtras);
   };
 
   if (!isOpen) {
@@ -52,14 +51,16 @@ export default function CustomizePizzaDialog({ product, isOpen, onClose, onAddTo
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle className="font-headline text-2xl text-primary">Personaliza tu {product.name}</DialogTitle>
           <DialogDescription>Añade ingredientes extra a tu pizza. Cada extra tiene un coste adicional.</DialogDescription>
         </DialogHeader>
 
-        <div className="flex-grow overflow-hidden flex flex-col gap-4 py-4">
-          <div className="flex items-center gap-4 px-1">
+        {/* Scrollable body content between header and footer */}
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
+          {/* Product Info */}
+          <div className="flex items-center gap-4">
             <Image src={product.imageUrl} alt={product.name} width={80} height={80} className="rounded-md object-cover" data-ai-hint={product.dataAiHint} />
             <div>
               <p className="text-sm text-muted-foreground">{product.description}</p>
@@ -67,8 +68,11 @@ export default function CustomizePizzaDialog({ product, isOpen, onClose, onAddTo
             </div>
           </div>
           
-          <h3 className="text-md font-semibold px-1 mt-2">Ingredientes Extra (1€ cada uno, salvo excepciones):</h3>
-          <ScrollArea className="flex-grow max-h-[250px] border rounded-md p-1"> {/* Increased max-h for better view */}
+          {/* Extras Title */}
+          <h3 className="text-md font-semibold">Ingredientes Extra (1€ cada uno, salvo excepciones):</h3>
+          
+          {/* ScrollArea for the extras list itself */}
+          <ScrollArea className="max-h-[250px] min-h-[100px] border rounded-md"> {/* Ensure it has some min height */}
             <div className="space-y-3 p-3">
               {availableExtras.map(extra => (
                 <div key={extra.name} className="flex items-center space-x-3">
@@ -87,7 +91,7 @@ export default function CustomizePizzaDialog({ product, isOpen, onClose, onAddTo
           </ScrollArea>
         </div>
 
-        <DialogFooter className="mt-auto pt-4 border-t">
+        <DialogFooter className="p-6 pt-4 border-t">
           <div className="w-full flex justify-between items-center mb-4">
             <span className="text-xl font-bold text-primary">Total: ${totalPrice.toFixed(2)}</span>
           </div>
