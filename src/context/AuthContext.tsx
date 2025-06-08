@@ -170,9 +170,11 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       // User profile will be fetched by onAuthStateChanged
-      const redirect = searchParams.get('redirect');
-      router.push(redirect || '/profile');
-      toast({ title: "Inicio de sesión exitoso", description: "¡Bienvenido de nuevo!" });
+      if (typeof window !== 'undefined') {
+        const redirect = searchParams.get('redirect');
+        router.push(redirect || '/profile');
+        toast({ title: "Inicio de sesión exitoso", description: "¡Bienvenido de nuevo!" });
+      }
     } catch (error: any) {
       console.error("Error during login:", error);
       toast({ title: "Error al iniciar sesión", description: error.message || "Por favor, revisa tus credenciales.", variant: "destructive" });
@@ -194,9 +196,11 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
           toast({ title: "Verifica tu correo", description: "Se ha enviado un correo de verificación a tu dirección. Por favor, revisa tu bandeja de entrada." });
       }
       // User profile will be fetched by onAuthStateChanged
-      const redirect = searchParams.get('redirect');
-      router.push(redirect || '/profile');
-      toast({ title: "Registro exitoso", description: "¡Bienvenido a PizzaPlace!" });
+      if (typeof window !== 'undefined') {
+        const redirect = searchParams.get('redirect');
+        router.push(redirect || '/profile');
+        toast({ title: "Registro exitoso", description: "¡Bienvenido a PizzaPlace!" });
+      }
     } catch (error: any) {
       console.error("Error during signup:", error);
       toast({ title: "Error al registrarse", description: error.message || "No se pudo crear la cuenta.", variant: "destructive" });
@@ -210,9 +214,11 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       // User profile will be fetched/created by onAuthStateChanged
-      const redirect = searchParams.get('redirect');
-      router.push(redirect || '/profile');
-      toast({ title: "Inicio de sesión con Google exitoso", description: `¡Bienvenido, ${result.user.displayName || result.user.email}!` });
+      if (typeof window !== 'undefined') {
+        const redirect = searchParams.get('redirect');
+        router.push(redirect || '/profile');
+        toast({ title: "Inicio de sesión con Google exitoso", description: `¡Bienvenido, ${result.user.displayName || result.user.email}!` });
+      }
     } catch (error: any) {
       console.error("Error during Google login:", error);
       let errorMessage = "No se pudo iniciar sesión con Google.";
