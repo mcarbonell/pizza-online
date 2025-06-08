@@ -46,7 +46,7 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription, // Reverted from ShadDialogDescription
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogClose,
@@ -532,7 +532,7 @@ export default function AdminPage() {
       <Card className="shadow-xl">
         <CardHeader className="border-b pb-4">
           <CardTitle className="text-3xl font-headline flex items-center gap-2"><LayoutDashboard /> Panel Admin</CardTitle>
-          <DialogDescription>Gestiona productos, pedidos y usuarios.</DialogDescription> 
+          <CardDescription>Gestiona productos, pedidos y usuarios.</CardDescription> 
         </CardHeader>
         <CardContent className="pt-6">
           <Tabs defaultValue="orders" className="w-full">
@@ -609,7 +609,10 @@ export default function AdminPage() {
               <Card>
                 <CardHeader className="border-b">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div><CardTitle className="text-2xl font-headline flex items-center gap-2"><ShoppingBasket />Gestión de Productos</CardTitle><DialogDescription>Añade, edita o elimina productos del menú.</DialogDescription></div>
+                    <div>
+                      <CardTitle className="text-2xl font-headline flex items-center gap-2"><ShoppingBasket />Gestión de Productos</CardTitle>
+                      <CardDescription>Añade, edita o elimina productos del menú.</CardDescription>
+                    </div>
                     <div className="flex gap-2">
                       <AlertDialog><AlertDialogTrigger asChild><Button variant="outline" disabled={isAnyActionInProgress}><UploadCloud className="mr-2"/>Sincr. Menú</Button></AlertDialogTrigger>
                         <AlertDialogContent>
@@ -675,3 +678,4 @@ export default function AdminPage() {
     </div>
   );
 }
+
