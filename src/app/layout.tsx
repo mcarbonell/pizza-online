@@ -56,14 +56,14 @@ export default function RootLayout({
                       <p className="text-xs mb-2">Realiza tu pedido por teléfono o WhatsApp:</p>
                       <div className="flex items-center mb-2">
                         <Phone className="h-5 w-5 mr-2 shrink-0" />
-                        <a href="tel:625377127" className="hover:underline text-base font-semibold">625 37 71 27</a>
+                        <a href="tel:625377127" className="hover:underline text-xl font-semibold">625 37 71 27</a>
                         <a href="https://wa.me/34625377127" target="_blank" rel="noopener noreferrer" className="ml-2 flex items-center hover:underline text-sm" aria-label="Pedir por WhatsApp al 625377127">
                           (<MessageSquare className="h-4 w-4 mr-1 shrink-0" /> WhatsApp)
                         </a>
                       </div>
                       <div className="flex items-center mb-2">
                          <Phone className="h-5 w-5 mr-2 shrink-0" /> 
-                        <a href="tel:953490434" className="hover:underline text-base font-semibold">953 49 04 34</a>
+                        <a href="tel:953490434" className="hover:underline text-xl font-semibold">953 49 04 34</a>
                       </div>
                       <a 
                         href="https://www.facebook.com/Pizzer%C3%ADa-Serranillo-329258410599768/" 

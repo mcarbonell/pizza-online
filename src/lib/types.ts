@@ -1,6 +1,29 @@
 
 export type ProductCategory = 'Pizzas' | 'Sides' | 'Drinks' | 'Desserts';
 
+export type AllergenCode =
+  | 'gluten'
+  | 'crustaceos'
+  | 'huevos'
+  | 'pescado'
+  | 'cacahuetes'
+  | 'soja'
+  | 'lacteos'
+  | 'frutos_sec_cascara'
+  | 'apio'
+  | 'mostaza'
+  | 'sesamo'
+  | 'sulfitos'
+  | 'altramuces'
+  | 'moluscos';
+
+export interface AllergenDisplayInfo {
+  code: AllergenCode;
+  name: string;
+  iconName: string; // Placeholder for icon representation (e.g., 'wheat-icon', 'fish-icon')
+  description: string; // Optional: Full description of the allergen
+}
+
 export interface ExtraItem {
   name: string;
   price: number;
@@ -14,6 +37,7 @@ export interface Product {
   imageUrl: string;
   category: ProductCategory;
   dataAiHint: string;
+  allergens?: AllergenCode[];
 }
 
 export type ProductSeedData = Omit<Product, 'id'>;
@@ -21,10 +45,7 @@ export type ProductSeedData = Omit<Product, 'id'>;
 
 export interface CartItem extends Product {
   quantity: number;
-  selectedExtras?: ExtraItem[]; // Extras selected for this specific cart item
-  // The 'price' property from Product remains the base price.
-  // Total price for this cart item instance = (base_price + sum of extras_prices) * quantity
-  // We add a uniqueId to distinguish between same products with different extras
+  selectedExtras?: ExtraItem[]; 
   cartItemId: string; 
 }
 
@@ -81,22 +102,20 @@ export const translateOrderStatus = (status: OrderStatus): string => {
   }
 };
 
-// Items in an order will reflect the state they were in when added to cart, including extras
-export interface OrderItem extends Omit<Product, 'id'> { // Product details at the time of order
-  productId: string; // Original product ID
+export interface OrderItem extends Omit<Product, 'id'> { 
+  productId: string; 
   quantity: number;
   selectedExtras?: ExtraItem[];
-  // Price here should be the unit price *including extras* at the time of purchase
-  // We'll calculate this when creating the order item for Stripe and Firestore
   unitPriceWithExtras: number; 
+  // allergens are part of the base product details
 }
 
 
 export interface Order {
   id?: string; 
   userId: string;
-  items: OrderItem[]; // Use OrderItem here
-  totalAmount: number; // This is the final total amount paid
+  items: OrderItem[]; 
+  totalAmount: number; 
   shippingAddress: ShippingAddressDetails; 
   paymentDetails: PaymentDetails; 
   createdAt: any; 
@@ -105,7 +124,7 @@ export interface Order {
   deliveryLocation?: {
     latitude: number;
     longitude: number;
-    timestamp: any; // Firestore serverTimestamp
+    timestamp: any; 
   } | null;
 }
 

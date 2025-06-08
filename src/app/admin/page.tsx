@@ -1,24 +1,25 @@
 
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus, ClipboardList, RefreshCcw, Users, UserCheck, UserCog, MapPin } from 'lucide-react';
+import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus, ClipboardList, RefreshCcw, Users, UserCheck, UserCog, MapPin, Sprout } from 'lucide-react'; // Added Sprout for allergens
 import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, query, orderBy, writeBatch, doc, updateDoc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import type { Product, Order, UserProfile, ProductCategory, OrderStatus } from '@/lib/types';
-import { translateOrderStatus } from '@/lib/types'; // Import the translation function
+import type { Product, Order, UserProfile, ProductCategory, OrderStatus, AllergenCode } from '@/lib/types';
+import { translateOrderStatus } from '@/lib/types'; 
 import { initialProductData } from '@/data/products';
+import { ALLERGEN_LIST, COMMON_PIZZA_ALLERGENS } from '@/data/allergens';
 import { useToast } from '@/hooks/use-toast';
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { getDownloadURL, ref as storageRef, uploadBytesResumable, deleteObject } from "firebase/storage";
 
-
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -57,6 +58,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const productCategories: ProductCategory[] = ['Pizzas', 'Sides', 'Drinks', 'Desserts'];
 const orderStatuses: OrderStatus[] = ['Pending', 'Processing', 'Out for Delivery', 'Delivered', 'Cancelled', 'PaymentFailed'];
@@ -79,6 +81,7 @@ const productFormSchema = z.object({
   }),
   imageUrl: z.string().url({ message: "Se requiere una URL de imagen válida." }).optional().or(z.literal('')),
   dataAiHint: z.string().max(30, "La pista de IA no debe exceder los 30 caracteres.").optional(),
+  allergens: z.array(z.string()).optional(), // Array of AllergenCode strings
 });
 
 type ProductFormValues = z.infer<typeof productFormSchema>;
@@ -119,13 +122,30 @@ export default function AdminPage() {
 
   const editForm = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
-    defaultValues: { name: "", description: "", price: 0, category: "Pizzas", imageUrl: "", dataAiHint: "", },
+    defaultValues: { name: "", description: "", price: 0, category: "Pizzas", imageUrl: "", dataAiHint: "", allergens: [] },
   });
 
   const addForm = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
-    defaultValues: { name: "", description: "", price: 0, category: "Pizzas", imageUrl: DEFAULT_PLACEHOLDER_IMAGE, dataAiHint: "", },
+    defaultValues: { name: "", description: "", price: 0, category: "Pizzas", imageUrl: DEFAULT_PLACEHOLDER_IMAGE, dataAiHint: "", allergens: [] },
   });
+
+  const watchedCategoryAddForm = addForm.watch("category");
+  useEffect(() => {
+    if (isAddModalOpen) { // Only run when add modal is open
+      if (watchedCategoryAddForm === "Pizzas") {
+        addForm.setValue("allergens", [...COMMON_PIZZA_ALLERGENS], { shouldValidate: true });
+      } else {
+        const currentAllergens = addForm.getValues("allergens") || [];
+        const allergensToRemove = COMMON_PIZZA_ALLERGENS.filter(ca => products.find(p => p.category !== "Pizzas" && p.allergens?.includes(ca)) === undefined); // Avoid removing common non-pizza allergens
+        const newAllergens = currentAllergens.filter(a => !allergensToRemove.includes(a as AllergenCode));
+        if (newAllergens.length !== currentAllergens.length) {
+             addForm.setValue("allergens", newAllergens, { shouldValidate: true });
+        }
+      }
+    }
+  }, [watchedCategoryAddForm, addForm, isAddModalOpen, products]);
+
 
   const resetImageStates = () => { setImageFile(null); setImagePreview(null); setUploadProgress(null); setIsUploading(false); };
 
@@ -170,7 +190,15 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (editingProduct) {
-      editForm.reset({ name: editingProduct.name, description: editingProduct.description, price: editingProduct.price, category: editingProduct.category, imageUrl: editingProduct.imageUrl, dataAiHint: editingProduct.dataAiHint || "", });
+      editForm.reset({ 
+        name: editingProduct.name, 
+        description: editingProduct.description, 
+        price: editingProduct.price, 
+        category: editingProduct.category, 
+        imageUrl: editingProduct.imageUrl, 
+        dataAiHint: editingProduct.dataAiHint || "", 
+        allergens: editingProduct.allergens || [] 
+      });
       setImagePreview(editingProduct.imageUrl || null); resetImageStates();
     } else { editForm.reset(editForm.formState.defaultValues); }
   }, [editingProduct, editForm]);
@@ -204,7 +232,13 @@ export default function AdminPage() {
   };
 
   const handleOpenEditModal = (product: Product) => { setEditingProduct(product); setIsEditModalOpen(true); };
-  const handleOpenAddModal = () => { addForm.reset(); resetImageStates(); setIsAddModalOpen(true); };
+  const handleOpenAddModal = () => { 
+    addForm.reset({ name: "", description: "", price: 0, category: "Pizzas", imageUrl: DEFAULT_PLACEHOLDER_IMAGE, dataAiHint: "", allergens: [] });
+    resetImageStates(); 
+    setIsAddModalOpen(true); 
+     // Trigger effect for default allergens
+    addForm.setValue("category", "Pizzas", { shouldValidate: true, shouldDirty: true });
+  };
   const handleOpenDeleteAlert = (product: Product) => { setProductToDelete(product); setIsDeleteAlertOpen(true); };
 
   const handleUpdateProduct = async (formData: ProductFormValues) => {
@@ -223,7 +257,8 @@ export default function AdminPage() {
           uploadTask.on('state_changed', (s) => setUploadProgress((s.bytesTransferred / s.totalBytes) * 100), reject, async () => resolve(await getDownloadURL(uploadTask.snapshot.ref)));
         });
       }
-      await updateDoc(doc(db, 'products', editingProduct.id), { ...formData, price: Number(formData.price), imageUrl: finalImageUrl, updatedAt: serverTimestamp() });
+      const dataToUpdate = { ...formData, price: Number(formData.price), imageUrl: finalImageUrl, allergens: formData.allergens || [], updatedAt: serverTimestamp() };
+      await updateDoc(doc(db, 'products', editingProduct.id), dataToUpdate);
       toast({ title: "Producto Actualizado", description: `"${formData.name}" actualizado.` });
       setIsEditModalOpen(false); setEditingProduct(null); resetImageStates(); fetchProducts();
     } catch (error) { console.error("Error updating product:", error); toast({ title: "Error al Actualizar", description: "No se pudo actualizar.", variant: "destructive" }); } 
@@ -233,7 +268,8 @@ export default function AdminPage() {
   const handleAddNewProduct = async (formData: ProductFormValues) => {
     setIsUploading(true); setUploadProgress(0);
     try {
-      const newDocRef = await addDoc(collection(db, 'products'), { ...formData, price: Number(formData.price), imageUrl: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      const dataToAdd = { ...formData, price: Number(formData.price), imageUrl: '', allergens: formData.allergens || [], createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+      const newDocRef = await addDoc(collection(db, 'products'), dataToAdd);
       let finalImageUrl = DEFAULT_PLACEHOLDER_IMAGE;
       if (imageFile) {
         const imageRef = storageRef(storage, `products/${newDocRef.id}/${imageFile.name}`);
@@ -388,6 +424,52 @@ export default function AdminPage() {
         </div>
       </FormItem>
       <FormField control={currentForm.control} name="dataAiHint" render={({ field }) => (<FormItem><FormLabel>Pista IA (1-2 palabras)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+      
+      <FormField
+        control={currentForm.control}
+        name="allergens"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="flex items-center gap-1.5"><Sprout className="h-4 w-4"/>Alérgenos</FormLabel>
+            <ScrollArea className="h-40 border rounded-md p-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+                {ALLERGEN_LIST.map((allergenInfo) => (
+                  <FormField
+                    key={allergenInfo.code}
+                    control={currentForm.control}
+                    name="allergens"
+                    render={() => { // field from outer scope is used
+                      return (
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value?.includes(allergenInfo.code)}
+                              onCheckedChange={(checked) => {
+                                const currentValues = field.value || [];
+                                return checked
+                                  ? field.onChange([...currentValues, allergenInfo.code])
+                                  : field.onChange(
+                                      currentValues.filter(
+                                        (value) => value !== allergenInfo.code
+                                      )
+                                    );
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal text-sm cursor-pointer" title={allergenInfo.description}>
+                            {allergenInfo.name}
+                          </FormLabel>
+                        </FormItem>
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+            </ScrollArea>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
     </>
   );
 
