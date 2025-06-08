@@ -1,3 +1,4 @@
+
 # Lista de Tareas Pendientes (TODO)
 
 Este documento rastrea las características y mejoras planificadas para Pizzería Serranillo.
@@ -11,7 +12,7 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
     - [x] Guardar pedidos en Firestore al completar el checkout (vía webhook de Stripe).
     - [x] Página para que los usuarios vean sus pedidos anteriores.
     - [x] Detalles de cada pedido.
-    - [x] **Actualización del estado del pedido en tiempo real (simulado con toasts en perfil).**
+    - [x] **Actualización del estado del pedido en tiempo real (con toasts en perfil y estados traducidos).**
 - [x] **Edición de Perfil de Usuario:**
     - [x] Permitir al usuario editar su nombre (`displayName`).
     - [x] Permitir al usuario editar/establecer su dirección de envío predeterminada.
@@ -20,13 +21,13 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
     - [x] Crear página básica `/admin` protegida por rol.
     - [x] Añadir enlace condicional al panel de admin en el Header.
     - [x] **Gestión de Productos (CRUD completo).**
-    - [x] Visualización y gestión de pedidos recibidos (cambio de estado).
+    - [x] Visualización y gestión de pedidos recibidos (cambio de estado, sin "Shipped", con traducciones).
     - [x] Visualización y gestión de roles de usuarios.
     - [ ] Gestión de categorías de productos.
 - [x] **Integración de Pasarela de Pago Real (Stripe):**
     - [x] Configurar cuenta de Stripe y obtener claves API (modo prueba).
     - [x] Añadir paquetes `stripe` y `@stripe/stripe-js`.
-    - [x] Crear API route `/api/stripe/create-checkout-session`.
+    - [x] Crear API route `/api/stripe/create-checkout-session` (configurada en EUR).
     - [x] Modificar `CheckoutForm.tsx` para redirigir a Stripe.
     - [x] Crear páginas de éxito (`/checkout/success`) y cancelación (`/checkout/cancel`).
     - [x] **Implementar Webhook de Stripe (`/api/stripe/webhook`):**
@@ -39,10 +40,12 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
     - [x] `manifest.json` creado.
     - [x] El usuario debe crear y añadir los iconos (`public/icons/`).
 - [ ] **Seguimiento de Pedidos en Tiempo Real (Avanzado):**
-    - [x] **Implementación Simplificada:** Seguimiento GPS desde el panel de admin (móvil del repartidor) a Firestore y visualización en mapa para el cliente (PWA, con limitaciones de segundo plano).
+    - [x] **Implementación Simplificada:** Seguimiento GPS desde el panel de admin (móvil del repartidor) a Firestore y visualización en mapa para el cliente (PWA, con limitaciones de segundo plano, mapa funcionando).
     - [ ] Implementar notificaciones Push reales (ej. FCM) para cambios de estado de pedido y seguimiento.
 - [x] **Internacionalización (i18n) - Textos en Español:**
-    - [x] Traducir los textos de la interfaz de cliente (home, checkout, producto, carrito, etc.) al español.
+    - [x] Traducir los textos de la interfaz de cliente (home, checkout, producto, carrito, etc.).
+    - [x] Información del negocio (footer, horario) en español.
+    - [x] Estados de pedido traducidos en la UI.
 - [ ] **Optimización de Consultas a Firestore:**
     - [ ] Revisar y optimizar índices de Firestore para consultas comunes (ej. pedidos por usuario, productos por categoría).
 - [ ] **Filtrado y Búsqueda de Productos:**
@@ -75,6 +78,7 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
 - [ ] **Manejo de Errores Avanzado:**
     *   [x] Página 404 personalizada (Next.js la provee por defecto, se puede customizar).
     *   [x] Mejora de los mensajes de error para el usuario (a través de toasts y FormMessage).
+    *   [x] Corrección de errores de análisis y renderizado en página de perfil.
 - [ ] **Sección de "Ofertas Especiales" o "Promociones".**
 - [ ] **Posibilidad de personalizar pizzas (ingredientes extra/quitados).**
 

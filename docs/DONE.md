@@ -1,3 +1,4 @@
+
 # Funcionalidades Implementadas (DONE)
 
 Este documento registra las características y tareas que ya se han completado en el proyecto Pizzería Serranillo.
@@ -22,6 +23,7 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Validación de campos del formulario usando React Hook Form y Zod.
     - [x] Resumen del pedido en la página de checkout.
     - [x] Creación de sesión de pago con Stripe.
+    - [x] Moneda de pago en Stripe configurada a EUR.
     - [x] Redirección a la pasarela de pago de Stripe.
     - [x] Páginas de éxito y cancelación de pago.
     - [x] Webhook de Stripe para procesar pedidos completados y guardarlos en Firestore.
@@ -34,11 +36,13 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Uso de iconos de Lucide React.
     - [x] Notificaciones (toasts) para acciones del usuario (ej. añadir al carrito, pedido realizado).
     - [x] Paleta de colores y tipografía consistentes (definidas en `globals.css` y `tailwind.config.ts`).
-    - [x] Componente de cabecera (Header) con logo y acceso al carrito.
-    - [x] Componente de pie de página (Footer) básico.
+    - [x] Componente de cabecera (Header) con logo ("Pizzería Serranillo - Horno de Leña") y acceso al carrito.
+    - [x] Componente de pie de página (Footer) con información completa del negocio (dirección, teléfonos, Facebook, IVA, copyright).
+    - [x] Sección de horario de apertura en la página de inicio.
     - [x] Reordenamiento de pestañas en perfil de cliente y panel de admin para mejor UX.
     - [x] Estados de pedido con colores distintivos en perfil de cliente.
     - [x] Textos de la interfaz de cliente mayormente en español.
+    - [x] Traducción de estados de pedido para la interfaz de usuario (ej. "Pending" -> "Pendiente").
 - **Estructura del Proyecto y Configuración:**
     - [x] Proyecto Next.js configurado con App Router.
     - [x] Uso de TypeScript.
@@ -60,6 +64,7 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Visualización de estado de verificación en perfil.
 - **Perfil de Usuario:**
     - [x] Página de perfil (`/profile`) para ver información del usuario y de Firebase Auth.
+    - [x] Corrección de errores de renderizado y análisis en la página de perfil.
     - [x] Visualización del historial de pedidos del usuario desde Firestore (con actualizaciones en tiempo real y toasts de notificación de cambio de estado).
     - [x] Edición de nombre, dirección de envío predeterminada.
     - [x] Ocultar UID de la vista del cliente.
@@ -73,6 +78,7 @@ Este documento registra las características y tareas que ya se han completado e
         - [x] Editar productos existentes con subida/actualización de imagen a Firebase Storage.
         - [x] Eliminar productos (con eliminación de imagen asociada de Firebase Storage).
     - [x] Visualización y gestión de pedidos recibidos (cambio de estado).
+    - [x] Eliminación del estado de pedido 'Shipped' y traducción visual de otros estados en el panel.
     - [x] Visualización y gestión de roles de usuarios.
 - **Documentación Inicial:**
     - [x] `README.md` básico explicando el proyecto. (Actualizado a versión más detallada)
@@ -82,7 +88,7 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Creado `manifest.json`.
     - [x] Enlaces y metadatos en `layout.tsx`. (Iconos deben ser creados manualmente por el usuario).
 - **Seguimiento de Pedidos Simplificado:**
-    - [x] El administrador puede iniciar/detener el envío de coordenadas GPS para un pedido marcado como "Out for Delivery".
-    - [x] El cliente puede ver la ubicación del repartidor en un mapa en su página de perfil si el pedido está "Out for Delivery".
+    - [x] El administrador puede iniciar/detener el envío de coordenadas GPS para un pedido marcado como "En Reparto" ("Out for Delivery").
+    - [x] El cliente puede ver la ubicación del repartidor en un mapa en su página de perfil si el pedido está "En Reparto" (funcionalidad de mapa corregida).
 
 Esta lista se actualizará a medida que se completen más tareas del archivo `TODO.md`.

@@ -1,10 +1,11 @@
+
 # Documentación de Arquitectura de Pizzería Serranillo
 
 Este documento describe la arquitectura de la aplicación web Pizzería Serranillo.
 
 ## 1. Visión General
 
-Pizzería Serranillo es una aplicación web moderna de comercio electrónico, enfocada en pedidos de pizza en línea. Está construida utilizando Next.js con el App Router, React para la interfaz de usuario, y Tailwind CSS junto con ShadCN UI para el diseño y los componentes. La gestión del estado del carrito se maneja a través de React Context y persiste en el Local Storage del navegador. La autenticación se realiza con Firebase Auth, los datos se almacenan en Firestore y los pagos se procesan con Stripe. Genkit está integrado para futuras funcionalidades de Inteligencia Artificial. La aplicación también está configurada como una Progressive Web App (PWA) y cuenta con una funcionalidad simplificada de seguimiento de pedidos en tiempo real.
+Pizzería Serranillo es una aplicación web moderna de comercio electrónico, enfocada en pedidos de pizza en línea. Está construida utilizando Next.js con el App Router, React para la interfaz de usuario, y Tailwind CSS junto con ShadCN UI para el diseño y los componentes. La gestión del estado del carrito se maneja a través de React Context y persiste en el Local Storage del navegador. La autenticación se realiza con Firebase Auth, los datos se almacenan en Firestore y los pagos se procesan con Stripe en EUR. Genkit está integrado para futuras funcionalidades de Inteligencia Artificial. La aplicación también está configurada como una Progressive Web App (PWA) y cuenta con una funcionalidad simplificada de seguimiento de pedidos en tiempo real. La información del negocio (dirección, contacto, horario, IVA) está integrada en la interfaz.
 
 ## 2. Pila Tecnológica (Tech Stack)
 
@@ -21,8 +22,8 @@ Pizzería Serranillo es una aplicación web moderna de comercio electrónico, en
     - _Razón:_ Framework CSS de utilidad primero que permite un desarrollo rápido y un diseño altamente personalizable sin escribir CSS tradicional.
 - **Iconos:** Lucide React
     - _Razón:_ Biblioteca de iconos SVG ligera, personalizable y fácil de usar.
-- **Mapas:** Leaflet con React-Leaflet
-    - _Razón:_ Biblioteca de mapas interactivos de código abierto, ligera y flexible. Usada para el seguimiento de pedidos.
+- **Mapas:** Leaflet con React-Leaflet (`react-leaflet@5.0.0-rc.1`)
+    - _Razón:_ Biblioteca de mapas interactivos de código abierto, ligera y flexible. Usada para el seguimiento de pedidos, con versión compatible con React 18.
 - **PWA:** `next-pwa`
     - _Razón:_ Facilita la creación de Progressive Web Apps con Next.js.
 
@@ -34,7 +35,7 @@ Pizzería Serranillo es una aplicación web moderna de comercio electrónico, en
 - **Almacenamiento de Archivos:** Firebase Storage
     - _Razón:_ Para almacenar imágenes de productos.
 - **Pasarela de Pago:** Stripe
-    - _Razón:_ Plataforma de pagos completa y popular, con buena documentación y SDKs.
+    - _Razón:_ Plataforma de pagos completa y popular, con buena documentación y SDKs. Los pagos se procesan en EUR.
 
 ### 2.3. Gestión de Estado
 - **Estado Global (Carrito):** React Context API (`CartContext`)
@@ -44,6 +45,7 @@ Pizzería Serranillo es una aplicación web moderna de comercio electrónico, en
 - **Estado de Autenticación:** React Context API (`AuthContext`)
     - _Razón:_ Para gestionar el estado del usuario autenticado y su perfil de Firestore a través de la aplicación.
 - **Estado de Ubicación (Repartidor):** Gestionado en el panel de admin (`AdminPage`) usando `navigator.geolocation` y almacenado en Firestore.
+- **Estado de Pedidos (`OrderStatus` en `src/lib/types.ts`):** Definidos como `Pending`, `Processing`, `Out for Delivery`, `Delivered`, `Cancelled`, `PaymentFailed`. Se utiliza una función `translateOrderStatus` para mostrar traducciones en español en la UI. El estado "Shipped" ha sido eliminado.
 
 ### 2.4. Formularios y Validación
 - **Gestión de Formularios:** React Hook Form
@@ -70,22 +72,22 @@ Pizzería Serranillo es una aplicación web moderna de comercio electrónico, en
 La estructura de directorios principal dentro de `src/` es la siguiente:
 
 - **`src/app/`**: Contiene las rutas y páginas de la aplicación utilizando el App Router de Next.js.
-    - `(layout).tsx`: Layout principal de la aplicación.
-    - `page.tsx`: Página de inicio (menú de productos).
+    - `(layout).tsx`: Layout principal de la aplicación (incluye cabecera y pie de página detallado con información del negocio).
+    - `page.tsx`: Página de inicio (menú de productos y horario de apertura).
     - `checkout/page.tsx`: Página de checkout.
     - `checkout/success/page.tsx`, `checkout/cancel/page.tsx`: Páginas de resultado de Stripe.
     - `profile/page.tsx`: Página de perfil del usuario (incluye visualización de mapa para seguimiento).
     - `admin/page.tsx`: Panel de administración (incluye lógica para iniciar/detener seguimiento GPS).
     - `login/page.tsx`, `signup/page.tsx`, `forgot-password/page.tsx`: Páginas de autenticación.
-    - `api/stripe/`: API routes para la integración con Stripe (crear sesión, webhook).
+    - `api/stripe/`: API routes para la integración con Stripe (crear sesión en EUR, webhook).
     - `globals.css`: Estilos globales y variables de tema de ShadCN/Tailwind.
 - **`src/components/`**: Componentes reutilizables de React.
     - `ui/`: Componentes de ShadCN UI (auto-generados o personalizados).
     - `cart/`: Componentes relacionados con el carrito de compras.
     - `checkout/`: Componentes para el proceso de checkout.
-    - `layout/`: Componentes estructurales.
+    - `layout/`: Componentes estructurales (Header, etc.).
     - `products/`: Componentes para mostrar productos.
-    - `icons/`: Componentes de iconos personalizados.
+    - `icons/`: Componentes de iconos personalizados (ej. `PizzaPlaceLogo.tsx`).
     - `maps/`: Componentes relacionados con mapas (ej. `OrderTrackingMap.tsx`).
 - **`src/context/`**: Proveedores de React Context.
 - **`src/data/`**: Datos estáticos de la aplicación.
@@ -93,7 +95,7 @@ La estructura de directorios principal dentro de `src/` es la siguiente:
 - **`src/lib/`**: Funciones de utilidad y definiciones de tipos.
     - `firebase.ts`: Configuración e inicialización de Firebase.
     - `stripe.ts`: Configuración de Stripe.
-    - `types.ts`: Definiciones de interfaces y tipos.
+    - `types.ts`: Definiciones de interfaces y tipos (incluye `OrderStatus` actualizado y `translateOrderStatus`).
     - `utils.ts`: Funciones de utilidad genéricas.
 - **`src/ai/`**: Lógica relacionada con Inteligencia Artificial utilizando Genkit.
 - **`docs/`**: Documentación del proyecto.
@@ -104,31 +106,35 @@ La estructura de directorios principal dentro de `src/` es la siguiente:
 
 ## 4. Flujo de Datos y Lógica de Negocio Clave
 
-(Se mantienen las secciones anteriores: Autenticación, Visualización de Productos, Gestión del Carrito, Proceso de Checkout, Gestión de Productos (Admin), Notificaciones de Estado de Pedido).
+(Se mantienen las secciones anteriores: Autenticación, Visualización de Productos, Gestión del Carrito, Proceso de Checkout, Gestión de Productos (Admin), Notificaciones de Estado de Pedido con estados traducidos).
 
 ### 4.7. Seguimiento de Pedidos en Tiempo Real (Simplificado)
 1.  **Panel de Admin (`AdminPage`):**
-    *   Cuando el administrador cambia el estado de un pedido a "Out for Delivery".
+    *   Cuando el administrador cambia el estado de un pedido a "En Reparto" ("Out for Delivery").
     *   Se utiliza `navigator.geolocation.watchPosition` para obtener la ubicación del dispositivo del administrador.
     *   Las coordenadas (latitud, longitud) y un `serverTimestamp` se actualizan en el campo `deliveryLocation` del documento del pedido en Firestore.
-    *   El seguimiento se detiene (`clearWatch`) y `deliveryLocation` se pone a `null` cuando el pedido cambia a otro estado (ej. "Delivered", "Cancelled").
+    *   El seguimiento se detiene (`clearWatch`) y `deliveryLocation` se pone a `null` cuando el pedido cambia a otro estado (ej. "Entregado", "Cancelado").
     *   El administrador debe conceder permisos de ubicación en su navegador. El seguimiento depende de que la pestaña del navegador esté activa.
 2.  **Perfil del Cliente (`ProfilePage`):**
     *   Escucha cambios en tiempo real en los pedidos del usuario mediante `onSnapshot`.
-    *   Si un pedido tiene el estado "Out for Delivery" y `deliveryLocation` no es nulo:
+    *   Si un pedido tiene el estado "En Reparto" y `deliveryLocation` no es nulo:
         *   Se renderiza un componente de mapa (`OrderTrackingMap`).
         *   El mapa muestra un marcador en la `latitude` y `longitude` de `deliveryLocation`.
         *   El marcador se actualiza cuando `deliveryLocation` cambia en Firestore.
 3.  **Componente de Mapa (`OrderTrackingMap`):**
     *   Utiliza `react-leaflet` para mostrar un mapa de OpenStreetMap.
     *   Se carga dinámicamente para evitar problemas de SSR.
-    *   Muestra un marcador en la posición proporcionada.
+    *   Muestra un marcador en la posición proporcionada. La funcionalidad del mapa ha sido corregida.
 
 ## 5. Estilo y Tematización
 - **`src/app/globals.css`**: Define variables CSS HSL para los colores del tema.
 - **`tailwind.config.ts`**: Configura Tailwind CSS.
 - Componentes de ShadCN UI en `src/components/ui/`.
 - CSS de Leaflet importado en `ProfilePage` para el mapa.
+- **Información del Negocio**:
+    - Sección de horario de apertura en la página de inicio (`src/app/page.tsx`).
+    - Pie de página detallado en `src/app/layout.tsx` con dirección, teléfonos, enlace a Facebook, aviso de IVA, y copyright.
+    - El logo incluye "Horno de Leña".
 
 ## 6. Consideraciones y Futuras Mejoras
 - Ver `docs/TODO.md` para la lista completa.
