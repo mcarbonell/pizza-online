@@ -40,11 +40,11 @@ export default function RootLayout({
               </main>
               <footer className="bg-primary text-primary-foreground py-8">
                 <div className="container mx-auto px-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start mb-6 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start mb-6">
                     {/* Columna 1: Nombre y Dirección */}
                     <div className="md:col-span-1">
                       <h3 className="text-lg font-semibold mb-2">Pizzería Serranillo</h3>
-                      <p className="flex items-start">
+                      <p className="flex items-start text-sm">
                         <MapPin className="h-4 w-4 mr-2 mt-1 shrink-0" />
                         <span>Carretera Hellín, Siles, Andalucía 23380</span>
                       </p>
@@ -54,22 +54,22 @@ export default function RootLayout({
                     <div className="md:col-span-1">
                       <h3 className="text-lg font-semibold mb-2">Pedidos y Contacto</h3>
                       <p className="text-xs mb-2">Realiza tu pedido por teléfono o WhatsApp:</p>
-                      <div className="flex items-center mb-1">
-                        <Phone className="h-4 w-4 mr-2 shrink-0" />
-                        <a href="tel:625377127" className="hover:underline">625 37 71 27</a>
-                        <a href="https://wa.me/34625377127" target="_blank" rel="noopener noreferrer" className="ml-2 flex items-center hover:underline" aria-label="Pedir por WhatsApp al 625377127">
-                          (<MessageSquare className="h-3 w-3 mr-1 shrink-0" /> WhatsApp)
+                      <div className="flex items-center mb-2">
+                        <Phone className="h-5 w-5 mr-2 shrink-0" />
+                        <a href="tel:625377127" className="hover:underline text-base font-semibold">625 37 71 27</a>
+                        <a href="https://wa.me/34625377127" target="_blank" rel="noopener noreferrer" className="ml-2 flex items-center hover:underline text-sm" aria-label="Pedir por WhatsApp al 625377127">
+                          (<MessageSquare className="h-4 w-4 mr-1 shrink-0" /> WhatsApp)
                         </a>
                       </div>
-                      <p className="flex items-center mb-2">
-                         <Phone className="h-4 w-4 mr-2 shrink-0" /> 
-                        <span><a href="tel:953490434" className="hover:underline">953 49 04 34</a></span>
-                      </p>
+                      <div className="flex items-center mb-2">
+                         <Phone className="h-5 w-5 mr-2 shrink-0" /> 
+                        <a href="tel:953490434" className="hover:underline text-base font-semibold">953 49 04 34</a>
+                      </div>
                       <a 
                         href="https://www.facebook.com/Pizzer%C3%ADa-Serranillo-329258410599768/" 
                         target="_blank" 
                         rel="noopener noreferrer" 
-                        className="inline-flex items-center hover:underline mt-1"
+                        className="inline-flex items-center hover:underline mt-1 text-sm"
                         aria-label="Pizzería Serranillo en Facebook"
                       >
                         <Facebook className="h-4 w-4 mr-2 shrink-0" /> Facebook
@@ -79,7 +79,7 @@ export default function RootLayout({
                     {/* Columna 3: Aviso IVA */}
                     <div className="md:col-span-1">
                         <h3 className="text-lg font-semibold mb-2">Importante</h3>
-                        <p className="flex items-center">
+                        <p className="flex items-center text-sm">
                           <Info className="h-4 w-4 mr-2 shrink-0" />
                           <span>IVA INCLUIDO EN TODOS LOS PRECIOS</span>
                         </p>
