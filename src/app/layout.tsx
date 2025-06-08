@@ -5,7 +5,7 @@ import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { Toaster } from "@/components/ui/toaster";
 import Header from '@/components/layout/Header';
-import { MapPin, Phone, Facebook, Heart, Info } from 'lucide-react';
+import { MapPin, Phone, Facebook, Heart, Info, MessageSquare } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Pizzería Serranillo - Pizzas y Más',
@@ -50,22 +50,26 @@ export default function RootLayout({
                       </p>
                     </div>
 
-                    {/* Columna 2: Teléfonos y Redes */}
+                    {/* Columna 2: Pedidos y Contacto */}
                     <div className="md:col-span-1">
-                      <h3 className="text-lg font-semibold mb-2">Contacto y Redes</h3>
-                      <p className="flex items-center mb-1">
+                      <h3 className="text-lg font-semibold mb-2">Pedidos y Contacto</h3>
+                      <p className="text-xs mb-2">Realiza tu pedido por teléfono o WhatsApp:</p>
+                      <div className="flex items-center mb-1">
                         <Phone className="h-4 w-4 mr-2 shrink-0" />
-                        <span><a href="tel:625377127" className="hover:underline">625 37 71 27</a></span>
-                      </p>
+                        <a href="tel:625377127" className="hover:underline">625 37 71 27</a>
+                        <a href="https://wa.me/34625377127" target="_blank" rel="noopener noreferrer" className="ml-2 flex items-center hover:underline" aria-label="Pedir por WhatsApp al 625377127">
+                          (<MessageSquare className="h-3 w-3 mr-1 shrink-0" /> WhatsApp)
+                        </a>
+                      </div>
                       <p className="flex items-center mb-2">
-                         <Phone className="h-4 w-4 mr-2 shrink-0 opacity-0 md:opacity-100" /> {/* Spacer for alignment or visible icon */}
+                         <Phone className="h-4 w-4 mr-2 shrink-0" /> 
                         <span><a href="tel:953490434" className="hover:underline">953 49 04 34</a></span>
                       </p>
                       <a 
                         href="https://www.facebook.com/Pizzer%C3%ADa-Serranillo-329258410599768/" 
                         target="_blank" 
                         rel="noopener noreferrer" 
-                        className="inline-flex items-center hover:underline"
+                        className="inline-flex items-center hover:underline mt-1"
                         aria-label="Pizzería Serranillo en Facebook"
                       >
                         <Facebook className="h-4 w-4 mr-2 shrink-0" /> Facebook
