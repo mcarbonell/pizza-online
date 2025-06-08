@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { LogIn } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation"; // Removed useSearchParams
 import { useEffect } from "react";
 
 const loginFormSchema = z.object({
@@ -43,14 +43,18 @@ const GoogleIcon = () => (
 export default function LoginPage() {
   const { user, login, loginWithGoogle, isLoading: authIsLoading } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectPath = searchParams.get('redirect') || '/profile';
+  // Removed: const searchParams = useSearchParams();
+  // Removed: const redirectPath = searchParams.get('redirect') || '/profile';
 
   useEffect(() => {
     if (!authIsLoading && user) {
-      router.push(redirectPath);
+      // Get redirectPath inside useEffect only when needed
+      const redirectPathFromUrl = typeof window !== 'undefined' 
+        ? new URLSearchParams(window.location.search).get('redirect') || '/profile' 
+        : '/profile';
+      router.push(redirectPathFromUrl);
     }
-  }, [user, authIsLoading, router, redirectPath]);
+  }, [user, authIsLoading, router]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -63,6 +67,7 @@ export default function LoginPage() {
   async function onSubmit(data: LoginFormValues) {
     try {
       await login(data.email, data.password);
+      // AuthContext now handles redirection using window.location.search internally
     } catch (error: any) {
       console.error("Login page submit error:", error);
     }
@@ -173,3 +178,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    
