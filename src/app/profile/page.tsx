@@ -60,13 +60,12 @@ const updateUserProfileSchema = z.object({
   const someShippingPresent = allShippingFieldsIncludingOptional.some(field => field && field.trim().length > 0);
 
   if (!someShippingPresent) {
-    return true; // All fields are empty or whitespace, which is valid.
+    return true; 
   }
 
-  // If some shipping detail IS provided, then all core required fields must be non-empty.
   const allCoreRequiredShippingPresent = 
     data.shippingName && data.shippingName.trim().length > 0 &&
-    data.shippingEmail && data.shippingEmail.trim().length > 0 && // Zod's .email() handles format
+    data.shippingEmail && data.shippingEmail.trim().length > 0 && 
     data.shippingAddress && data.shippingAddress.trim().length > 0 &&
     data.shippingCity && data.shippingCity.trim().length > 0 &&
     data.shippingPostalCode && data.shippingPostalCode.trim().length > 0;
@@ -282,14 +281,14 @@ export default function ProfilePage() {
 
                           <Accordion type="single" collapsible className="w-full">
                             <AccordionItem value="items"> <AccordionTrigger className="text-base font-semibold">Ver {order.items.length} Artículo(s)</AccordionTrigger>
-                              <AccordionContent> <ul className="space-y-3 pt-2"> {order.items.map((item) => ( <li key={item.id} className="flex items-center justify-between gap-3 p-2 rounded-md bg-muted/20"> <div className="flex items-center gap-3"> <Image src={item.imageUrl} alt={item.name} width={40} height={40} className="rounded object-cover" data-ai-hint={item.dataAiHint || ''}/> <div><p className="font-semibold text-sm">{item.name}</p><p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p></div> </div> <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p> </li> ))} </ul> </AccordionContent>
+                              <AccordionContent> <ul className="space-y-3 pt-2"> {order.items.map((item) => ( <li key={`${order.id}-${item.productId}-${item.name}`} className="flex items-center justify-between gap-3 p-2 rounded-md bg-muted/20"> <div className="flex items-center gap-3"> <Image src={item.imageUrl} alt={item.name} width={40} height={40} className="rounded object-cover" data-ai-hint={item.dataAiHint || ''}/> <div><p className="font-semibold text-sm">{item.name}</p><p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p></div> </div> <p className="font-semibold text-sm">€{(item.price * item.quantity).toFixed(2)}</p> </li> ))} </ul> </AccordionContent>
                             </AccordionItem>
                             <AccordionItem value="shipping"> <AccordionTrigger className="text-base font-semibold">Detalles de Envío</AccordionTrigger>
                               <AccordionContent className="text-sm space-y-1 pt-2"> <p><strong>Nombre:</strong> {order.shippingAddress.name}</p> <p><strong>Email:</strong> {order.shippingAddress.email}</p> <p><strong>Dirección:</strong> {order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.postalCode}</p> {order.shippingAddress.phone && <p><strong><Phone className="inline h-4 w-4 mr-1"/>Teléfono:</strong> {order.shippingAddress.phone}</p>} </AccordionContent>
                             </AccordionItem>
                           </Accordion>
                         </CardContent>
-                        <CardFooter className="bg-muted/30 p-4 rounded-b-lg flex justify-end items-center"> <div className="flex items-center gap-1.5 text-lg font-bold text-primary"><DollarSign className="h-5 w-5" />Total: ${order.totalAmount.toFixed(2)}</div> </CardFooter>
+                        <CardFooter className="bg-muted/30 p-4 rounded-b-lg flex justify-end items-center"> <div className="flex items-center gap-1.5 text-lg font-bold text-primary"><DollarSign className="h-5 w-5" />Total: €{order.totalAmount.toFixed(2)}</div> </CardFooter>
                       </Card> ))} </div> )}
               </section>
             </TabsContent>
@@ -317,3 +316,4 @@ export default function ProfilePage() {
         </Card>
   );
 }
+

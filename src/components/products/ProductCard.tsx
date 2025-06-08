@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import { useCart } from '@/context/CartContext';
-import { PlusCircle, Settings2, Info } from 'lucide-react'; // Added Info icon for tooltips
-import { useToast } from '@/hooks/use-toast';
+import { PlusCircle, Settings2 } from 'lucide-react'; // Removed Info icon as Tooltip provides context
+// import { useToast } from '@/hooks/use-toast'; // Toast removed
 import { useState } from 'react';
 import CustomizePizzaDialog from './CustomizePizzaDialog';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ALLERGEN_LIST } from '@/data/allergens'; // Import the allergen list
+import { ALLERGEN_LIST } from '@/data/allergens'; 
 
 interface ProductCardProps {
   product: Product;
@@ -20,7 +20,7 @@ interface ProductCardProps {
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
-  const { toast } = useToast();
+  // const { toast } = useToast(); // Toast removed
   const [isCustomizeDialogOpen, setIsCustomizeDialogOpen] = useState(false);
 
   const handleOpenCustomizeDialog = () => {
@@ -28,19 +28,13 @@ export default function ProductCard({ product }: ProductCardProps) {
       setIsCustomizeDialogOpen(true);
     } else {
       addToCart(product, []);
-      toast({
-        title: `¡${product.name} añadido al carrito!`,
-        description: "Puedes ver tu carrito o seguir comprando.",
-      });
+      // Toast removed - sidebar opening is the feedback
     }
   };
 
   const handleAddToCartWithExtras = (customizedProduct: Product, extras: ExtraItem[]) => {
     addToCart(customizedProduct, extras);
-    toast({
-      title: `¡${customizedProduct.name} ${extras.length > 0 ? '(con extras)' : ''} añadido al carrito!`,
-      description: "Puedes ver tu carrito o seguir comprando.",
-    });
+    // Toast removed - sidebar opening is the feedback
     setIsCustomizeDialogOpen(false);
   };
 
@@ -98,7 +92,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           )}
         </CardContent>
         <CardFooter className="p-4 flex justify-between items-center border-t">
-          <p className="text-xl font-bold text-primary">${product.price.toFixed(2)}</p>
+          <p className="text-xl font-bold text-primary">€{product.price.toFixed(2)}</p>
           <Button 
             variant="default" 
             onClick={handleOpenCustomizeDialog} 

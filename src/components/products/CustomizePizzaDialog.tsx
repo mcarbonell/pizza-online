@@ -43,6 +43,7 @@ export default function CustomizePizzaDialog({ product, isOpen, onClose, onAddTo
 
   const handleSubmit = () => {
     onAddToCart(product, selectedExtras);
+    // Toast is handled by the caller (ProductCard) or not at all if removed there
   };
 
   if (!isOpen) {
@@ -57,22 +58,18 @@ export default function CustomizePizzaDialog({ product, isOpen, onClose, onAddTo
           <DialogDescription>Añade ingredientes extra a tu pizza. Cada extra tiene un coste adicional.</DialogDescription>
         </DialogHeader>
 
-        {/* Scrollable body content between header and footer */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
-          {/* Product Info */}
           <div className="flex items-center gap-4">
             <Image src={product.imageUrl} alt={product.name} width={80} height={80} className="rounded-md object-cover" data-ai-hint={product.dataAiHint} />
             <div>
               <p className="text-sm text-muted-foreground">{product.description}</p>
-              <p className="text-lg font-semibold">Precio Base: ${product.price.toFixed(2)}</p>
+              <p className="text-lg font-semibold">Precio Base: €{product.price.toFixed(2)}</p>
             </div>
           </div>
           
-          {/* Extras Title */}
           <h3 className="text-md font-semibold">Ingredientes Extra (1€ cada uno, salvo excepciones):</h3>
           
-          {/* ScrollArea for the extras list itself */}
-          <ScrollArea className="max-h-[350px] min-h-[100px] border rounded-md"> {/* Ensure it has some min height */}
+          <ScrollArea className="max-h-[350px] min-h-[100px] border rounded-md">
             <div className="space-y-3 p-3">
               {availableExtras.map(extra => (
                 <div key={extra.name} className="flex items-center space-x-3">
@@ -84,7 +81,7 @@ export default function CustomizePizzaDialog({ product, isOpen, onClose, onAddTo
                   <Label htmlFor={`extra-${extra.name.replace(/\s+/g, '-')}`} className="flex-grow cursor-pointer text-sm">
                     {extra.name}
                   </Label>
-                  <span className="text-sm text-muted-foreground">${extra.price.toFixed(2)}</span>
+                  <span className="text-sm text-muted-foreground">€{extra.price.toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -93,7 +90,7 @@ export default function CustomizePizzaDialog({ product, isOpen, onClose, onAddTo
 
         <DialogFooter className="p-6 pt-4 border-t">
           <div className="w-full flex justify-between items-center mb-4">
-            <span className="text-xl font-bold text-primary">Total: ${totalPrice.toFixed(2)}</span>
+            <span className="text-xl font-bold text-primary">Total: €{totalPrice.toFixed(2)}</span>
           </div>
           <DialogClose asChild>
             <Button type="button" variant="outline">Cancelar</Button>
