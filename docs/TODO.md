@@ -20,7 +20,7 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
     - [x] Definir rol 'admin' en `UserProfile` (Firestore).
     - [x] Crear página básica `/admin` protegida por rol.
     - [x] Añadir enlace condicional al panel de admin en el Header.
-    - [x] **Gestión de Productos (CRUD completo).**
+    - [x] **Gestión de Productos (CRUD completo, incluyendo gestión de alérgenos).**
     - [x] Visualización y gestión de pedidos recibidos (cambio de estado, sin "Shipped", con traducciones).
     - [x] Visualización y gestión de roles de usuarios.
     - [ ] Gestión de categorías de productos.
@@ -32,7 +32,7 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
     - [x] Modificar `CheckoutForm.tsx` para redirigir a Stripe.
     - [x] Crear páginas de éxito (`/checkout/success`) y cancelación (`/checkout/cancel`).
     - [x] **Implementar Webhook de Stripe (`/api/stripe/webhook`):**
-        - [x] Manejar evento `checkout.session.completed` para crear el pedido en Firestore (incluyendo extras).
+        - [x] Manejar evento `checkout.session.completed` para crear el pedido en Firestore (incluyendo extras y alérgenos).
         - [ ] Manejar otros eventos relevantes (ej. `payment_intent.succeeded`, `payment_intent.payment_failed`).
         - [x] Asegurar y verificar firmas de webhook.
     - [x] Configurar Stripe CLI para pruebas locales de webhooks.
@@ -55,6 +55,12 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
 - [x] **Personalización de Productos:**
     - [x] **Ingredientes Extra para Pizzas:** Permitir seleccionar ingredientes extra con coste adicional (1€ por extra) desde un modal.
     - [ ] **Mitad y Mitad (Pizzas):** Permitir seleccionar dos mitades diferentes para una pizza (coste adicional 1€). (Complejidad alta, futura mejora).
+- [x] **Gestión y Visualización de Alérgenos:**
+    - [x] Definición de tipos de datos y listado maestro de alérgenos.
+    - [x] Productos en `src/data/products.ts` incluyen lista de alérgenos.
+    - [x] Panel de admin permite seleccionar alérgenos al crear/editar productos.
+    - [x] Sincronización de menú actualiza alérgenos de productos existentes en Firestore.
+    - [x] Alérgenos visibles en `ProductCard` con tooltips descriptivos.
 
 
 ## Mejoras de IA con Genkit
@@ -78,17 +84,25 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
 - [ ] **Mejoras de Accesibilidad (A11y):**
     *   [ ] Auditoría completa de accesibilidad.
     *   [ ] Asegurar el cumplimiento de WCAG AA.
+    *   [x] **Corrección de errores de validación HTML en diálogos del panel de admin.**
 - [ ] **Configuración de CI/CD:**
     *   [ ] Pipeline para compilación, pruebas y despliegue automáticos.
+- [x] **Mejoras UI/UX en el Carrito de Compras:**
+    *   [x] Corregido icono de cierre duplicado.
+    *   [x] Mejorado espaciado y legibilidad de textos en ítems.
+    *   [x] Reorganizado footer del carrito para mejor visualización del subtotal.
+    *   [x] Eliminado toast innecesario al añadir producto.
 - [ ] **Manejo de Errores Avanzado:**
     *   [x] Página 404 personalizada (Next.js la provee por defecto, se puede customizar).
     *   [x] Mejora de los mensajes de error para el usuario (a través de toasts y FormMessage).
     *   [x] Corrección de errores de análisis y renderizado en página de perfil.
 - [ ] **Sección de "Ofertas Especiales" o "Promociones".**
+- [ ] **Integrar Iconos SVG para Alérgenos en `ProductCard`.**
 
 ## Documentación
-- [x] Mantener actualizada la documentación de arquitectura.
+- [x] Mantener actualizada la documentación de arquitectura, README, DONE y TODO.
 - [ ] Documentar componentes complejos.
 - [ ] Añadir guías para desarrolladores (cómo levantar el entorno, convenciones de código).
 
 Este listado es dinámico y se actualizará a medida que el proyecto avance.
+

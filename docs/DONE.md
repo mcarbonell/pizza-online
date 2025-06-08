@@ -7,11 +7,15 @@ Este documento registra las características y tareas que ya se han completado e
 - **Menú Interactivo de Productos:**
     - [x] Visualización de productos por categorías (Pizzas, Acompañamientos, Bebidas, Postres).
     - [x] Tarjetas de producto con nombre, descripción, precio e imagen.
-    - [x] Datos de productos cargados desde un archivo estático (`src/data/products.ts`) para importación inicial.
+    - [x] **Información de Alérgenos:**
+        - [x] Definición de tipos y datos de alérgenos (`src/lib/types.ts`, `src/data/allergens.ts`).
+        - [x] Datos de productos (`src/data/products.ts`) incluyen alérgenos.
+        - [x] Visualización de alérgenos (como badges con tooltips) en las tarjetas de producto (`ProductCard.tsx`).
+    - [x] Datos de productos cargados desde un archivo estático (`src/data/products.ts`) para importación/sincronización inicial.
     - [x] Productos ahora cargados desde Firestore en la página principal.
 - **Carrito de Compras:**
     - [x] Añadir productos al carrito desde las tarjetas de producto.
-    - [x] **Modal de personalización para pizzas para seleccionar ingredientes extra (con coste adicional).**
+    - [x] Modal de personalización para pizzas para seleccionar ingredientes extra (con coste adicional).
     - [x] Sidebar del carrito para ver los artículos añadidos, incluyendo detalles de extras.
     - [x] Actualizar cantidad de artículos en el carrito (manejo de ítems únicos por producto + combinación de extras).
     - [x] Eliminar artículos del carrito.
@@ -19,15 +23,20 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Cálculo en tiempo real del subtotal y número total de artículos (considerando precio de extras).
     - [x] Persistencia del carrito entre sesiones utilizando Local Storage.
     - [x] Botón para abrir/cerrar el carrito en la cabecera.
+    - [x] **Mejoras UI/UX en el carrito:**
+        - [x] Corregido icono de cierre duplicado.
+        - [x] Mejorado espaciado y legibilidad de textos e ítems.
+        - [x] Eliminado toast de "producto añadido" (sidebar es suficiente feedback).
+        - [x] Reorganizado footer del carrito para mejor visualización del subtotal.
 - **Proceso de Checkout (Integrado con Stripe):**
     - [x] Formulario de checkout para información de contacto y entrega.
     - [x] Validación de campos del formulario usando React Hook Form y Zod.
     - [x] Resumen del pedido en la página de checkout, mostrando ingredientes extra.
     - [x] Creación de sesión de pago con Stripe, enviando precio total con extras y detalles en metadata.
-    - [x] Moneda de pago en Stripe configurada a EUR.
+    - [x] Moneda de pago en Stripe configurada a EUR (corregido uso de '$' por '€' en UI).
     - [x] Redirección a la pasarela de pago de Stripe.
     - [x] Páginas de éxito y cancelación de pago.
-    - [x] Webhook de Stripe para procesar pedidos completados y guardarlos en Firestore (incluyendo información de ingredientes extra y precio unitario con extras).
+    - [x] Webhook de Stripe para procesar pedidos completados y guardarlos en Firestore (incluyendo información de ingredientes extra y alérgenos del producto).
     - [x] Limpieza del carrito tras un pago exitoso.
     - [x] Mensaje de "Carrito vacío" en la página de checkout si no hay artículos.
 - **Diseño y UI/UX:**
@@ -35,7 +44,7 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Interfaz de usuario moderna y atractiva utilizando ShadCN UI components.
     - [x] Estilizado con Tailwind CSS.
     - [x] Uso de iconos de Lucide React.
-    - [x] Notificaciones (toasts) para acciones del usuario (ej. añadir al carrito, pedido realizado).
+    - [x] Notificaciones (toasts) para acciones del usuario (ej. pedido realizado, errores de autenticación).
     - [x] Paleta de colores y tipografía consistentes (definidas en `globals.css` y `tailwind.config.ts`).
     - [x] Componente de cabecera (Header) con logo ("Pizzería Serranillo - Horno de Leña") y acceso al carrito.
     - [x] Componente de pie de página (Footer) con información completa del negocio (dirección, teléfonos, Facebook, IVA, copyright).
@@ -44,11 +53,11 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Estados de pedido con colores distintivos en perfil de cliente.
     - [x] Textos de la interfaz de cliente mayormente en español.
     - [x] Traducción de estados de pedido para la interfaz de usuario (ej. "Pending" -> "Pendiente").
-    - [x] **Eliminación del estado de pedido "Shipped" para simplificar.**
+    - [x] Eliminación del estado de pedido "Shipped" para simplificar.
 - **Estructura del Proyecto y Configuración:**
     - [x] Proyecto Next.js configurado con App Router.
     - [x] Uso de TypeScript.
-    - [x] Estructura de carpetas organizada para componentes, contexto, datos, hooks, etc. (incluye `availableExtras.ts` y `CustomizePizzaDialog.tsx`).
+    - [x] Estructura de carpetas organizada para componentes, contexto, datos, hooks, etc. (incluye `availableExtras.ts`, `allergens.ts` y `CustomizePizzaDialog.tsx`).
     - [x] Configuración inicial de Genkit (preparado para funcionalidades de IA).
     - [x] Configuración de ESLint y Prettier (asumido por Next.js y buenas prácticas).
     - [x] `next.config.ts` configurado para imágenes (incluyendo `firebasestorage.googleapis.com`) y para ignorar errores de build de TS/ESLint temporalmente.
@@ -73,13 +82,17 @@ Este documento registra las características y tareas que ya se han completado e
 - **Panel de Administración (`/admin`):**
     - [x] Ruta `/admin` protegida por rol 'admin' (definido en perfil de usuario en Firestore).
     - [x] Enlace condicional al panel de admin en el Header.
-    - [x] **Gestión de Productos (CRUD completo).**
+    - [x] **Gestión de Productos (CRUD completo, incluyendo selección de alérgenos).**
+        - [x] Checkboxes para seleccionar alérgenos de una lista.
+        - [x] Preselección de alérgenos comunes para pizzas nuevas.
+        - [x] Sincronización de menú desde archivo `products.ts` que actualiza/añade productos y alérgenos, protegiendo imágenes existentes.
     - [x] Visualización y gestión de pedidos recibidos (cambio de estado).
     - [x] Eliminación del estado de pedido 'Shipped' y traducción visual de otros estados en el panel.
     - [x] Visualización y gestión de roles de usuarios.
+    - [x] **Corrección de errores de validación HTML en diálogo de sincronización de menú.**
 - **Documentación Inicial:**
     - [x] `README.md` básico explicando el proyecto. (Actualizado a versión más detallada)
-    - [x] Creación de archivos de planificación del proyecto: `docs/TODO.md`, `docs/DONE.md`, `docs/ARCHITECTURE.md`, `docs/BUGS.md`.
+    - [x] Creación de archivos de planificación del proyecto: `docs/TODO.md`, `docs/DONE.md`, `docs/ARCHITECTURE.md`, `docs/BUGS.md`. (Actualizados)
 - **PWA (Progressive Web App):**
     - [x] Añadido `next-pwa` y configuración básica.
     - [x] Creado `manifest.json`.
