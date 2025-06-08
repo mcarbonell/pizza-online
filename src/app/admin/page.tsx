@@ -46,7 +46,7 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+  DialogDescription, // Keep this for Dialog modals
   DialogHeader,
   DialogTitle,
   DialogClose,
@@ -619,16 +619,18 @@ export default function AdminPage() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>¿Confirmar Sincronización de Menú?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              <div>
-                                <div className="mb-2">Esta acción comparará los productos del archivo de datos inicial (`src/data/products.ts`) con los productos existentes en Firestore.</div>
+                              Esta acción actualiza el menú desde el archivo de datos. Los productos nuevos se añadirán y los existentes se actualizarán. Las imágenes subidas se protegerán.
+                            </AlertDialogDescription>
+                            {/* Detailed explanation, not part of ARIA description, but visually present */}
+                            <div className="text-sm text-muted-foreground mt-2 space-y-2">
+                                <p>La sincronización comparará los productos del archivo de datos (`src/data/products.ts`) con los productos existentes en Firestore:</p>
                                 <ul className="list-disc list-inside text-sm space-y-1">
                                   <li><Info className="inline h-4 w-4 mr-1 text-blue-500"/>Los productos nuevos del archivo se añadirán a Firestore.</li>
                                   <li><Info className="inline h-4 w-4 mr-1 text-orange-500"/>Los productos existentes en Firestore que también estén en el archivo se actualizarán (incluyendo alérgenos).</li>
                                   <li><Info className="inline h-4 w-4 mr-1 text-green-500"/>Las imágenes ya subidas a Firebase Storage se protegerán y no se sobrescribirán con placeholders del archivo.</li>
                                   <li><Info className="inline h-4 w-4 mr-1 text-red-500"/>Esta acción no elimina productos de Firestore que no estén en el archivo.</li>
                                 </ul>
-                              </div>
-                            </AlertDialogDescription>
+                            </div>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel disabled={isSyncingMenu}>Cancelar</AlertDialogCancel>
