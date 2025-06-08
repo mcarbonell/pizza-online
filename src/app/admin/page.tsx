@@ -46,7 +46,7 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription as ShadDialogDescription, // Renamed to avoid conflict
+  DialogDescription, // Reverted from ShadDialogDescription
   DialogHeader,
   DialogTitle,
   DialogClose,
@@ -532,7 +532,7 @@ export default function AdminPage() {
       <Card className="shadow-xl">
         <CardHeader className="border-b pb-4">
           <CardTitle className="text-3xl font-headline flex items-center gap-2"><LayoutDashboard /> Panel Admin</CardTitle>
-          <ShadDialogDescription>Gestiona productos, pedidos y usuarios.</ShadDialogDescription>
+          <DialogDescription>Gestiona productos, pedidos y usuarios.</DialogDescription> 
         </CardHeader>
         <CardContent className="pt-6">
           <Tabs defaultValue="orders" className="w-full">
@@ -609,7 +609,7 @@ export default function AdminPage() {
               <Card>
                 <CardHeader className="border-b">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div><CardTitle className="text-2xl font-headline flex items-center gap-2"><ShoppingBasket />Gestión de Productos</CardTitle><ShadDialogDescription>Añade, edita o elimina productos del menú.</ShadDialogDescription></div>
+                    <div><CardTitle className="text-2xl font-headline flex items-center gap-2"><ShoppingBasket />Gestión de Productos</CardTitle><DialogDescription>Añade, edita o elimina productos del menú.</DialogDescription></div>
                     <div className="flex gap-2">
                       <AlertDialog><AlertDialogTrigger asChild><Button variant="outline" disabled={isAnyActionInProgress}><UploadCloud className="mr-2"/>Sincr. Menú</Button></AlertDialogTrigger>
                         <AlertDialogContent>
@@ -656,13 +656,13 @@ export default function AdminPage() {
       </Card>
 
       <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => { setIsEditModalOpen(isOpen); if (!isOpen) { setEditingProduct(null); editForm.reset(); resetImageStates();}}}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="flex items-center gap-2"><Edit/>Editar Producto</DialogTitle><ShadDialogDescription>Modifica "{editingProduct?.name}".</ShadDialogDescription></DialogHeader>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="flex items-center gap-2"><Edit/>Editar Producto</DialogTitle><DialogDescription>Modifica "{editingProduct?.name}".</DialogDescription></DialogHeader>
           <Form {...editForm}><form onSubmit={editForm.handleSubmit(handleUpdateProduct)} className="space-y-4 py-4">{renderProductFormFields(editForm, imagePreview || editingProduct?.imageUrl || null)}<DialogFooter className="mt-6"><DialogClose asChild><Button type="button" variant="ghost" disabled={isAnyActionInProgress}>Cancelar</Button></DialogClose><Button type="submit" disabled={isUploading || editForm.formState.isSubmitting || isAnyActionInProgress}>{isUploading?<Loader2 className="animate-spin"/>:<Save/>}{isUploading?'Subiendo...':'Guardar'}</Button></DialogFooter></form></Form>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isAddModalOpen} onOpenChange={(isOpen) => { setIsAddModalOpen(isOpen); if (!isOpen) { addForm.reset(); resetImageStates();}}}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="flex items-center gap-2"><PackagePlus/>Añadir Producto</DialogTitle><ShadDialogDescription>Completa los detalles.</ShadDialogDescription></DialogHeader>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="flex items-center gap-2"><PackagePlus/>Añadir Producto</DialogTitle><DialogDescription>Completa los detalles.</DialogDescription></DialogHeader>
           <Form {...addForm}><form onSubmit={addForm.handleSubmit(handleAddNewProduct)} className="space-y-4 py-4">{renderProductFormFields(addForm, imagePreview)}<DialogFooter className="mt-6"><DialogClose asChild><Button type="button" variant="ghost" disabled={isAnyActionInProgress}>Cancelar</Button></DialogClose><Button type="submit" disabled={isUploading || addForm.formState.isSubmitting || isAnyActionInProgress}>{isUploading?<Loader2 className="animate-spin"/>:<Save/>}{isUploading?'Subiendo...':'Añadir'}</Button></DialogFooter></form></Form>
         </DialogContent>
       </Dialog>
@@ -675,7 +675,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    
-
-    
