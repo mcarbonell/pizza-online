@@ -1,5 +1,5 @@
 
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next'; // Added Viewport
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
@@ -10,8 +10,15 @@ import { MapPin, Phone, Facebook, Heart, Info, MessageSquare } from 'lucide-reac
 export const metadata: Metadata = {
   title: 'Pizzería Serranillo - Pizzas y Más',
   description: '¡Pide tu pizza favorita, acompañamientos y bebidas online en Pizzería Serranillo!',
-  manifest: '/manifest.json', // Link to the manifest file
-  themeColor: '#E63946', // Corresponds to primary color
+  // manifest: '/manifest.json', // Removed, next-pwa handles this or direct link below is fine
+  // themeColor: '#E63946', // Moved to viewport export
+};
+
+export const viewport: Viewport = { // Added viewport export
+  themeColor: '#E63946',
+  initialScale: 1,
+  width: 'device-width',
+  // manifest: '/manifest.json', // next-pwa should also handle this if configured
 };
 
 export default function RootLayout({
@@ -27,7 +34,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Belleza&display=swap" rel="stylesheet" />
         <link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,700;0,800;0,900;1,400;1,500;1,700;1,800;1,900&display=swap" rel="stylesheet" />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#E63946" />
+        {/* <meta name="theme-color" content="#E63946" /> Replaced by viewport export */}
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png"></link>
       </head>
       <body className="font-body antialiased">

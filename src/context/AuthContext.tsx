@@ -3,7 +3,7 @@
 
 import type { User, UserProfile, UpdateUserProfileFormValues, ShippingAddressDetails, SimulatedPaymentMethod } from '@/lib/types';
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useCallback, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation'; // Removed useSearchParams from here
 import { auth, googleProvider, db } from '@/lib/firebase';
 import { 
   onAuthStateChanged, 
@@ -71,7 +71,6 @@ const createUserProfileDocument = async (firebaseUser: FirebaseUser) => {
         createdAt,
         updatedAt: createdAt,
         defaultShippingAddress: null,
-        defaultPaymentMethod: null,
       });
       console.log("User profile document created for new user:", uid);
     } catch (error) {
@@ -118,7 +117,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
   const [isLoadingUserProfile, setIsLoadingUserProfile] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const searchParams = useSearchParams();
+  // REMOVED: const searchParams = useSearchParams(); 
   const { toast } = useToast();
 
   const fetchUserProfileCb = useCallback(async (uid: string) => {
@@ -169,9 +168,9 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // User profile will be fetched by onAuthStateChanged
       if (typeof window !== 'undefined') {
-        const redirect = searchParams.get('redirect');
+        const currentSearchParams = new URLSearchParams(window.location.search);
+        const redirect = currentSearchParams.get('redirect');
         router.push(redirect || '/profile');
         toast({ title: "Inicio de sesión exitoso", description: "¡Bienvenido de nuevo!" });
       }
@@ -181,7 +180,7 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [router, searchParams, toast]);
+  }, [router, toast]);
 
   const signupCb = useCallback(async (email: string, password: string, name?: string) => {
     setIsLoading(true);
@@ -191,13 +190,12 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
           if (name) {
             await updateFirebaseProfile(userCredential.user, { displayName: name });
           }
-          // createUserProfileDocument will be called by onAuthStateChanged
           await sendEmailVerification(userCredential.user);
           toast({ title: "Verifica tu correo", description: "Se ha enviado un correo de verificación a tu dirección. Por favor, revisa tu bandeja de entrada." });
       }
-      // User profile will be fetched by onAuthStateChanged
       if (typeof window !== 'undefined') {
-        const redirect = searchParams.get('redirect');
+        const currentSearchParams = new URLSearchParams(window.location.search);
+        const redirect = currentSearchParams.get('redirect');
         router.push(redirect || '/profile');
         toast({ title: "Registro exitoso", description: "¡Bienvenido a PizzaPlace!" });
       }
@@ -207,15 +205,15 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [router, searchParams, toast]);
+  }, [router, toast]);
 
   const loginWithGoogleCb = useCallback(async () => {
     setIsLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      // User profile will be fetched/created by onAuthStateChanged
       if (typeof window !== 'undefined') {
-        const redirect = searchParams.get('redirect');
+        const currentSearchParams = new URLSearchParams(window.location.search);
+        const redirect = currentSearchParams.get('redirect');
         router.push(redirect || '/profile');
         toast({ title: "Inicio de sesión con Google exitoso", description: `¡Bienvenido, ${result.user.displayName || result.user.email}!` });
       }
@@ -235,13 +233,12 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [router, searchParams, toast]);
+  }, [router, toast]);
 
   const logoutCb = useCallback(async () => {
     setIsLoading(true);
     try {
       await signOut(auth);
-      // setUser and setUserProfile will be set to null by onAuthStateChanged
       router.push('/');
       toast({ title: "Cierre de sesión exitoso", description: "Has cerrado sesión correctamente." });
     } catch (error: any) {
@@ -337,15 +334,10 @@ function AuthProviderInternal({ children }: AuthProviderProps) {
          updates.defaultShippingAddress = null;
       }
       
-      if (data.paymentLast4Digits && data.paymentExpiryDate) {
-        const newPaymentMethod: SimulatedPaymentMethod = {
-            last4Digits: data.paymentLast4Digits.slice(-4),
-            expiryDate: data.paymentExpiryDate,
-        };
-        updates.defaultPaymentMethod = newPaymentMethod;
-      } else {
-        updates.defaultPaymentMethod = null;
-      }
+      // Removed paymentLast4Digits and paymentExpiryDate logic as it was not fully implemented
+      // and not directly related to the current UserProfile structure.
+      // If payment method storage is needed, it should be handled with care (e.g., storing tokens, not raw details).
+      // updates.defaultPaymentMethod = null; // Assuming we are not handling this for now
 
       await updateDoc(userRef, updates);
       await fetchUserProfileCb(firebaseUser.uid); 
