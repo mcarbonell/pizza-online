@@ -28,22 +28,22 @@ export default function CartItemCard({ item }: CartItemCardProps) {
   const totalItemPrice = unitPriceWithExtras * item.quantity;
 
   return (
-    <div className="flex items-start gap-4 py-4 border-b">
+    <div className="flex items-start gap-3 sm:gap-4 py-4 border-b last:border-b-0">
       <Image
         src={item.imageUrl}
         alt={item.name}
-        width={72} // Slightly larger image
-        height={72}
-        className="rounded-md object-cover self-start"
+        width={64} 
+        height={64}
+        className="rounded-md object-cover self-start shrink-0" // Added shrink-0
         data-ai-hint={item.dataAiHint}
       />
       <div className="flex-grow space-y-1.5">
-        <h4 className="font-headline text-base sm:text-lg leading-tight">{item.name}</h4>
-        <p className="text-xs sm:text-sm text-muted-foreground">Precio base: €{item.price.toFixed(2)}</p>
+        <h4 className="font-headline text-base sm:text-lg leading-tight mb-0.5">{item.name}</h4>
+        <p className="text-xs text-muted-foreground">Precio base: €{item.price.toFixed(2)}</p>
         {item.selectedExtras && item.selectedExtras.length > 0 && (
-          <div className="mt-1.5">
-            <p className="text-xs font-medium text-muted-foreground">Extras:</p>
-            <ul className="list-disc list-inside pl-3 sm:pl-4 space-y-0.5">
+          <div className="mt-1">
+            <p className="text-xs font-medium text-muted-foreground mb-0.5">Extras:</p>
+            <ul className="list-disc list-inside pl-3 space-y-0.5">
               {item.selectedExtras.map(extra => (
                 <li key={extra.name} className="text-xs text-muted-foreground">
                   {extra.name} (+€{extra.price.toFixed(2)})
@@ -53,16 +53,16 @@ export default function CartItemCard({ item }: CartItemCardProps) {
           </div>
         )}
       </div>
-      <div className="flex flex-col items-end justify-between self-stretch gap-2 min-w-[110px] sm:min-w-[120px]">
+      <div className="flex flex-col items-end justify-between self-stretch gap-2 min-w-[100px] sm:min-w-[110px]">
         <div className="flex items-center gap-1.5">
           <Button
             variant="outline"
             size="icon"
-            className="h-7 w-7 sm:h-8 sm:w-8"
+            className="h-8 w-8 shrink-0" // Consistent size
             onClick={() => handleQuantityChange(item.quantity - 1)}
             aria-label="Reducir cantidad"
           >
-            <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <Minus className="h-4 w-4" />
           </Button>
           <Input
             type="number"
@@ -71,18 +71,18 @@ export default function CartItemCard({ item }: CartItemCardProps) {
               const val = parseInt(e.target.value, 10);
               if (!isNaN(val)) handleQuantityChange(val);
             }}
-            className="h-7 w-10 sm:h-8 sm:w-12 text-center"
+            className="h-8 w-10 text-center px-1 py-1" // Adjusted padding & width
             min="0"
             aria-label="Cantidad"
           />
           <Button
             variant="outline"
             size="icon"
-            className="h-7 w-7 sm:h-8 sm:w-8"
+            className="h-8 w-8 shrink-0" // Consistent size
             onClick={() => handleQuantityChange(item.quantity + 1)}
             aria-label="Aumentar cantidad"
           >
-            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
         <div className="text-right mt-1">
@@ -93,13 +93,12 @@ export default function CartItemCard({ item }: CartItemCardProps) {
           variant="ghost" 
           size="icon" 
           onClick={() => removeFromCart(item.cartItemId)} 
-          className="text-destructive hover:text-destructive/80 h-7 w-7 sm:h-8 sm:w-8 mt-auto"
+          className="text-destructive hover:text-destructive/80 h-8 w-8 mt-auto" // Consistent size
           aria-label="Eliminar del carrito"
         >
-          <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+          <Trash2 className="h-4 sm:h-5 w-4 sm:w-5" />
         </Button>
       </div>
     </div>
   );
 }
-
