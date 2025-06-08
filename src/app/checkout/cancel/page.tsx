@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button"; // Import buttonVariants
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { XCircle } from "lucide-react";
 import Link from "next/link";
@@ -26,9 +26,13 @@ export default function CheckoutCancelPage() {
             <Button asChild size="lg">
               <Link href="/">Volver al Menú</Link>
             </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link href="/#contact">Contactar Soporte</Link> {/* Placeholder, you might not have a contact section */}
-            </Button>
+            {/* Changed Button asChild to Link with buttonVariants */}
+            <Link 
+              href="/#contact" 
+              className={buttonVariants({ variant: "outline", size: "lg" })}
+            >
+              Contactar Soporte
+            </Link>
           </div>
         </CardContent>
       </Card>
