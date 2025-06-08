@@ -72,7 +72,7 @@ export default function CustomizePizzaDialog({ product, isOpen, onClose, onAddTo
           <h3 className="text-md font-semibold">Ingredientes Extra (1€ cada uno, salvo excepciones):</h3>
           
           {/* ScrollArea for the extras list itself */}
-          <ScrollArea className="max-h-[250px] min-h-[100px] border rounded-md"> {/* Ensure it has some min height */}
+          <ScrollArea className="max-h-[350px] min-h-[100px] border rounded-md"> {/* Ensure it has some min height */}
             <div className="space-y-3 p-3">
               {availableExtras.map(extra => (
                 <div key={extra.name} className="flex items-center space-x-3">
