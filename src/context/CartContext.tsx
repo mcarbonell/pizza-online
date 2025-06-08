@@ -1,14 +1,26 @@
 
 "use client";
 
-import type { CartItem, Product } from '@/lib/types';
+import type { CartItem, Product, ExtraItem } from '@/lib/types';
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useCallback } from 'react';
+
+// Helper to generate a unique ID for cart items based on product ID and extras
+const generateCartItemId = (productId: string, extras?: ExtraItem[]): string => {
+  if (!extras || extras.length === 0) {
+    return productId;
+  }
+  // Sort extras by name to ensure consistent ID regardless of selection order
+  const sortedExtras = [...extras].sort((a, b) => a.name.localeCompare(b.name));
+  const extrasString = sortedExtras.map(ex => `${ex.name}:${ex.price}`).join('|');
+  return `${productId}-${extrasString}`;
+};
+
 
 interface CartContextType {
   cartItems: CartItem[];
-  addToCart: (product: Product) => void;
-  removeFromCart: (productId: string) => void;
-  updateItemQuantity: (productId: string, quantity: number) => void;
+  addToCart: (product: Product, extras?: ExtraItem[]) => void;
+  removeFromCart: (cartItemId: string) => void;
+  updateItemQuantity: (cartItemId: string, quantity: number) => void;
   clearCart: () => void;
   getCartTotal: () => number;
   getTotalItems: () => number;
@@ -61,28 +73,29 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     }
   }, [cartItems, isInitialized]);
 
-  const addToCart = useCallback((product: Product) => {
+  const addToCart = useCallback((product: Product, extras: ExtraItem[] = []) => {
+    const cartItemId = generateCartItemId(product.id, extras);
     setCartItems((prevItems) => {
-      const existingItem = prevItems.find((item) => item.id === product.id);
+      const existingItem = prevItems.find((item) => item.cartItemId === cartItemId);
       if (existingItem) {
         return prevItems.map((item) =>
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+          item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prevItems, { ...product, quantity: 1 }];
+      return [...prevItems, { ...product, quantity: 1, selectedExtras: extras, cartItemId }];
     });
-    setIsCartOpen(true); // Open cart when item is added
+    if (!isCartOpen) setIsCartOpen(true);
+  }, [isCartOpen]);
+
+  const removeFromCart = useCallback((cartItemId: string) => {
+    setCartItems((prevItems) => prevItems.filter((item) => item.cartItemId !== cartItemId));
   }, []);
 
-  const removeFromCart = useCallback((productId: string) => {
-    setCartItems((prevItems) => prevItems.filter((item) => item.id !== productId));
-  }, []);
-
-  const updateItemQuantity = useCallback((productId: string, quantity: number) => {
+  const updateItemQuantity = useCallback((cartItemId: string, quantity: number) => {
     setCartItems((prevItems) =>
       prevItems.map((item) =>
-        item.id === productId ? { ...item, quantity: Math.max(0, quantity) } : item
-      ).filter(item => item.quantity > 0)
+        item.cartItemId === cartItemId ? { ...item, quantity: Math.max(0, quantity) } : item
+      ).filter(item => item.quantity > 0) // Remove item if quantity is 0
     );
   }, []);
 
@@ -98,7 +111,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   }, []);
 
   const getCartTotal = useCallback(() => {
-    return cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+    return cartItems.reduce((total, item) => {
+      const extrasPrice = item.selectedExtras?.reduce((sum, extra) => sum + extra.price, 0) || 0;
+      return total + (item.price + extrasPrice) * item.quantity;
+    }, 0);
   }, [cartItems]);
 
   const getTotalItems = useCallback(() => {

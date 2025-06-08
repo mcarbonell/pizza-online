@@ -74,32 +74,45 @@ export default function CheckoutPage() {
               <CardDescription>{totalItems} {totalItems === 1 ? 'artículo' : 'artículos'} en tu carrito</CardDescription>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[300px] pr-4">
-                {cartItems.map((item) => (
-                  <div key={item.id} className="flex justify-between items-center py-3 border-b last:border-b-0">
-                    <div className="flex items-center gap-3">
-                      <Image
-                        src={item.imageUrl}
-                        alt={item.name}
-                        width={48}
-                        height={48}
-                        className="rounded object-cover"
-                        data-ai-hint={item.dataAiHint}
-                      />
-                      <div>
-                        <p className="font-semibold text-sm">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">Cantidad: {item.quantity}</p>
+              <ScrollArea className="h-[400px] pr-4"> {/* Increased height for potentially longer items with extras */}
+                {cartItems.map((item) => {
+                  const extrasPrice = item.selectedExtras?.reduce((sum, extra) => sum + extra.price, 0) || 0;
+                  const unitPriceWithExtras = item.price + extrasPrice;
+                  const totalItemPrice = unitPriceWithExtras * item.quantity;
+                  
+                  return (
+                    <div key={item.cartItemId} className="flex justify-between items-start py-3 border-b last:border-b-0">
+                      <div className="flex items-start gap-3">
+                        <Image
+                          src={item.imageUrl}
+                          alt={item.name}
+                          width={48}
+                          height={48}
+                          className="rounded object-cover mt-1"
+                          data-ai-hint={item.dataAiHint}
+                        />
+                        <div>
+                          <p className="font-semibold text-sm">{item.name}</p>
+                          {item.selectedExtras && item.selectedExtras.length > 0 && (
+                            <ul className="text-xs text-muted-foreground mt-0.5">
+                              {item.selectedExtras.map(extra => (
+                                <li key={extra.name}>+ {extra.name} (${extra.price.toFixed(2)})</li>
+                              ))}
+                            </ul>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">Cantidad: {item.quantity}</p>
+                        </div>
                       </div>
+                      <p className="font-semibold text-sm text-right min-w-[70px]">€{totalItemPrice.toFixed(2)}</p>
                     </div>
-                    <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </ScrollArea>
             </CardContent>
             <CardFooter className="flex flex-col space-y-2 pt-4 border-t">
               <div className="flex justify-between w-full font-semibold text-lg">
                 <span>Total:</span>
-                <span>${total.toFixed(2)}</span>
+                <span>€{total.toFixed(2)}</span>
               </div>
             </CardFooter>
           </Card>

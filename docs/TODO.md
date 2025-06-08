@@ -24,14 +24,15 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
     - [x] Visualización y gestión de pedidos recibidos (cambio de estado, sin "Shipped", con traducciones).
     - [x] Visualización y gestión de roles de usuarios.
     - [ ] Gestión de categorías de productos.
+    - [ ] Gestión de ingredientes extra disponibles (CRUD en panel de admin).
 - [x] **Integración de Pasarela de Pago Real (Stripe):**
     - [x] Configurar cuenta de Stripe y obtener claves API (modo prueba).
     - [x] Añadir paquetes `stripe` y `@stripe/stripe-js`.
-    - [x] Crear API route `/api/stripe/create-checkout-session` (configurada en EUR).
+    - [x] Crear API route `/api/stripe/create-checkout-session` (configurada en EUR, maneja precios con extras).
     - [x] Modificar `CheckoutForm.tsx` para redirigir a Stripe.
     - [x] Crear páginas de éxito (`/checkout/success`) y cancelación (`/checkout/cancel`).
     - [x] **Implementar Webhook de Stripe (`/api/stripe/webhook`):**
-        - [x] Manejar evento `checkout.session.completed` para crear el pedido en Firestore.
+        - [x] Manejar evento `checkout.session.completed` para crear el pedido en Firestore (incluyendo extras).
         - [ ] Manejar otros eventos relevantes (ej. `payment_intent.succeeded`, `payment_intent.payment_failed`).
         - [x] Asegurar y verificar firmas de webhook.
     - [x] Configurar Stripe CLI para pruebas locales de webhooks.
@@ -51,6 +52,10 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
 - [ ] **Filtrado y Búsqueda de Productos:**
     - [ ] Permitir a los usuarios filtrar productos por categoría en la página principal.
     - [ ] Añadir una barra de búsqueda de productos.
+- [x] **Personalización de Productos:**
+    - [x] **Ingredientes Extra para Pizzas:** Permitir seleccionar ingredientes extra con coste adicional (1€ por extra) desde un modal.
+    - [ ] **Mitad y Mitad (Pizzas):** Permitir seleccionar dos mitades diferentes para una pizza (coste adicional 1€). (Complejidad alta, futura mejora).
+
 
 ## Mejoras de IA con Genkit
 - [ ] **Recomendaciones de Pizza Personalizadas:**
@@ -80,7 +85,6 @@ Este documento rastrea las características y mejoras planificadas para Pizzerí
     *   [x] Mejora de los mensajes de error para el usuario (a través de toasts y FormMessage).
     *   [x] Corrección de errores de análisis y renderizado en página de perfil.
 - [ ] **Sección de "Ofertas Especiales" o "Promociones".**
-- [ ] **Posibilidad de personalizar pizzas (ingredientes extra/quitados).**
 
 ## Documentación
 - [x] Mantener actualizada la documentación de arquitectura.

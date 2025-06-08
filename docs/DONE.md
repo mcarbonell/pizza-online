@@ -11,22 +11,23 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Productos ahora cargados desde Firestore en la página principal.
 - **Carrito de Compras:**
     - [x] Añadir productos al carrito desde las tarjetas de producto.
-    - [x] Sidebar del carrito para ver los artículos añadidos.
-    - [x] Actualizar cantidad de artículos en el carrito.
+    - [x] **Modal de personalización para pizzas para seleccionar ingredientes extra (con coste adicional).**
+    - [x] Sidebar del carrito para ver los artículos añadidos, incluyendo detalles de extras.
+    - [x] Actualizar cantidad de artículos en el carrito (manejo de ítems únicos por producto + combinación de extras).
     - [x] Eliminar artículos del carrito.
     - [x] Limpiar todo el carrito.
-    - [x] Cálculo en tiempo real del subtotal y número total de artículos.
+    - [x] Cálculo en tiempo real del subtotal y número total de artículos (considerando precio de extras).
     - [x] Persistencia del carrito entre sesiones utilizando Local Storage.
     - [x] Botón para abrir/cerrar el carrito en la cabecera.
 - **Proceso de Checkout (Integrado con Stripe):**
     - [x] Formulario de checkout para información de contacto y entrega.
     - [x] Validación de campos del formulario usando React Hook Form y Zod.
-    - [x] Resumen del pedido en la página de checkout.
-    - [x] Creación de sesión de pago con Stripe.
+    - [x] Resumen del pedido en la página de checkout, mostrando ingredientes extra.
+    - [x] Creación de sesión de pago con Stripe, enviando precio total con extras y detalles en metadata.
     - [x] Moneda de pago en Stripe configurada a EUR.
     - [x] Redirección a la pasarela de pago de Stripe.
     - [x] Páginas de éxito y cancelación de pago.
-    - [x] Webhook de Stripe para procesar pedidos completados y guardarlos en Firestore.
+    - [x] Webhook de Stripe para procesar pedidos completados y guardarlos en Firestore (incluyendo información de ingredientes extra y precio unitario con extras).
     - [x] Limpieza del carrito tras un pago exitoso.
     - [x] Mensaje de "Carrito vacío" en la página de checkout si no hay artículos.
 - **Diseño y UI/UX:**
@@ -43,10 +44,11 @@ Este documento registra las características y tareas que ya se han completado e
     - [x] Estados de pedido con colores distintivos en perfil de cliente.
     - [x] Textos de la interfaz de cliente mayormente en español.
     - [x] Traducción de estados de pedido para la interfaz de usuario (ej. "Pending" -> "Pendiente").
+    - [x] **Eliminación del estado de pedido "Shipped" para simplificar.**
 - **Estructura del Proyecto y Configuración:**
     - [x] Proyecto Next.js configurado con App Router.
     - [x] Uso de TypeScript.
-    - [x] Estructura de carpetas organizada para componentes, contexto, datos, hooks, etc.
+    - [x] Estructura de carpetas organizada para componentes, contexto, datos, hooks, etc. (incluye `availableExtras.ts` y `CustomizePizzaDialog.tsx`).
     - [x] Configuración inicial de Genkit (preparado para funcionalidades de IA).
     - [x] Configuración de ESLint y Prettier (asumido por Next.js y buenas prácticas).
     - [x] `next.config.ts` configurado para imágenes (incluyendo `firebasestorage.googleapis.com`) y para ignorar errores de build de TS/ESLint temporalmente.
@@ -71,12 +73,7 @@ Este documento registra las características y tareas que ya se han completado e
 - **Panel de Administración (`/admin`):**
     - [x] Ruta `/admin` protegida por rol 'admin' (definido en perfil de usuario en Firestore).
     - [x] Enlace condicional al panel de admin en el Header.
-    - [x] **Gestión de Productos (CRUD completo):**
-        - [x] Listar productos desde Firestore.
-        - [x] Importar menú inicial a Firestore.
-        - [x] Añadir nuevos productos con subida de imagen a Firebase Storage.
-        - [x] Editar productos existentes con subida/actualización de imagen a Firebase Storage.
-        - [x] Eliminar productos (con eliminación de imagen asociada de Firebase Storage).
+    - [x] **Gestión de Productos (CRUD completo).**
     - [x] Visualización y gestión de pedidos recibidos (cambio de estado).
     - [x] Eliminación del estado de pedido 'Shipped' y traducción visual de otros estados en el panel.
     - [x] Visualización y gestión de roles de usuarios.
