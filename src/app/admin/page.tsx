@@ -6,10 +6,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus, ClipboardList, RefreshCcw, Users, UserCheck, UserCog, MapPin, Sprout } from 'lucide-react'; // Added Sprout for allergens
+import { LayoutDashboard, PackagePlus, ListOrdered, Edit, Trash2, AlertCircle, ShoppingBasket, Loader2, UploadCloud, ShieldAlert, Save, ImagePlus, ClipboardList, RefreshCcw, Users, UserCheck, UserCog, MapPin, Sprout, Info } from 'lucide-react'; // Added Sprout for allergens
 import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, query, orderBy, writeBatch, doc, updateDoc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import type { Product, Order, UserProfile, ProductCategory, OrderStatus, AllergenCode } from '@/lib/types';
+import type { Product, Order, UserProfile, ProductCategory, OrderStatus, AllergenCode, ProductSeedData } from '@/lib/types';
 import { translateOrderStatus } from '@/lib/types'; 
 import { initialProductData } from '@/data/products';
 import { ALLERGEN_LIST, COMMON_PIZZA_ALLERGENS } from '@/data/allergens';
@@ -95,7 +95,7 @@ export default function AdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [productError, setProductError] = useState<string | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
+  const [isSyncingMenu, setIsSyncingMenu] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -132,12 +132,12 @@ export default function AdminPage() {
 
   const watchedCategoryAddForm = addForm.watch("category");
   useEffect(() => {
-    if (isAddModalOpen) { // Only run when add modal is open
+    if (isAddModalOpen) { 
       if (watchedCategoryAddForm === "Pizzas") {
         addForm.setValue("allergens", [...COMMON_PIZZA_ALLERGENS], { shouldValidate: true });
       } else {
         const currentAllergens = addForm.getValues("allergens") || [];
-        const allergensToRemove = COMMON_PIZZA_ALLERGENS.filter(ca => products.find(p => p.category !== "Pizzas" && p.allergens?.includes(ca)) === undefined); // Avoid removing common non-pizza allergens
+        const allergensToRemove = COMMON_PIZZA_ALLERGENS.filter(ca => products.find(p => p.category !== "Pizzas" && p.allergens?.includes(ca)) === undefined); 
         const newAllergens = currentAllergens.filter(a => !allergensToRemove.includes(a as AllergenCode));
         if (newAllergens.length !== currentAllergens.length) {
              addForm.setValue("allergens", newAllergens, { shouldValidate: true });
@@ -219,24 +219,78 @@ export default function AdminPage() {
     else { setImageFile(null); setImagePreview(null); }
   };
 
-  const handleImportInitialMenu = async () => {
-    setIsImporting(true);
+  const handleSyncMenuFromFile = async () => {
+    setIsSyncingMenu(true);
     try {
+      const productsCollectionRef = collection(db, 'products');
+      const querySnapshot = await getDocs(productsCollectionRef);
+      const existingProducts = querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Product));
+      
       const batch = writeBatch(db);
-      initialProductData.forEach(p => batch.set(doc(collection(db, 'products')), p));
+      let addedCount = 0;
+      let updatedCount = 0;
+
+      for (const productSeed of initialProductData) {
+        const existingProduct = existingProducts.find(p => p.name === productSeed.name && p.category === productSeed.category);
+
+        if (existingProduct) {
+          // Product exists, update it
+          const productRef = doc(db, 'products', existingProduct.id);
+          const updateData: Partial<Product> = { // Use Partial<Product> for update
+            name: productSeed.name,
+            description: productSeed.description,
+            price: productSeed.price,
+            category: productSeed.category,
+            dataAiHint: productSeed.dataAiHint,
+            allergens: productSeed.allergens || [],
+            updatedAt: serverTimestamp(),
+          };
+
+          // Protect existing non-placeholder image
+          if (existingProduct.imageUrl && 
+              !existingProduct.imageUrl.includes('placehold.co') && 
+              productSeed.imageUrl && 
+              productSeed.imageUrl.includes('placehold.co')) {
+            updateData.imageUrl = existingProduct.imageUrl;
+          } else {
+            updateData.imageUrl = productSeed.imageUrl;
+          }
+          
+          batch.update(productRef, updateData);
+          updatedCount++;
+        } else {
+          // Product does not exist, create it
+          const productRef = doc(collection(db, 'products'));
+          const dataToAdd: Omit<Product, 'id'> & { createdAt: any, updatedAt: any } = {
+            ...productSeed,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          };
+          batch.set(productRef, dataToAdd);
+          addedCount++;
+        }
+      }
+
       await batch.commit();
-      toast({ title: "Menú Importado", description: `${initialProductData.length} productos importados.` });
+      toast({ 
+        title: "Menú Sincronizado", 
+        description: `${addedCount} productos añadidos, ${updatedCount} productos actualizados desde el archivo.` 
+      });
       fetchProducts();
-    } catch (error) { console.error("Error importing initial menu:", error); toast({ title: "Error de Importación", description: "No se pudo importar el menú.", variant: "destructive" }); } 
-    finally { setIsImporting(false); }
+    } catch (error) { 
+      console.error("Error syncing menu from file:", error); 
+      toast({ title: "Error de Sincronización", description: "No se pudo sincronizar el menú.", variant: "destructive" }); 
+    } finally { 
+      setIsSyncingMenu(false); 
+    }
   };
+
 
   const handleOpenEditModal = (product: Product) => { setEditingProduct(product); setIsEditModalOpen(true); };
   const handleOpenAddModal = () => { 
     addForm.reset({ name: "", description: "", price: 0, category: "Pizzas", imageUrl: DEFAULT_PLACEHOLDER_IMAGE, dataAiHint: "", allergens: [] });
     resetImageStates(); 
     setIsAddModalOpen(true); 
-     // Trigger effect for default allergens
     addForm.setValue("category", "Pizzas", { shouldValidate: true, shouldDirty: true });
   };
   const handleOpenDeleteAlert = (product: Product) => { setProductToDelete(product); setIsDeleteAlertOpen(true); };
@@ -402,7 +456,7 @@ export default function AdminPage() {
   if (authIsLoading || isLoadingUserProfile) { return <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary mb-4" /><p>Cargando...</p></div>; }
   if (!user || (userProfile && userProfile.role !== 'admin')) { return <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]"><ShieldAlert className="h-12 w-12 text-destructive mb-4" /><p>Acceso denegado.</p><Button onClick={() => router.push('/')} variant="link">Inicio</Button></div>; }
 
-  const isAnyActionInProgress = isImporting || isUploading || isDeletingProduct || isUpdatingOrderStatus || isUpdatingUserRole;
+  const isAnyActionInProgress = isSyncingMenu || isUploading || isDeletingProduct || isUpdatingOrderStatus || isUpdatingUserRole;
 
   const renderProductFormFields = (currentForm: typeof editForm | typeof addForm, currentImagePreview: string | null) => (
     <>
@@ -438,7 +492,7 @@ export default function AdminPage() {
                     key={allergenInfo.code}
                     control={currentForm.control}
                     name="allergens"
-                    render={() => { // field from outer scope is used
+                    render={() => { 
                       return (
                         <FormItem className="flex flex-row items-center space-x-2 space-y-0">
                           <FormControl>
@@ -557,8 +611,28 @@ export default function AdminPage() {
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div><CardTitle className="text-2xl font-headline flex items-center gap-2"><ShoppingBasket />Gestión de Productos</CardTitle><CardDescription>Añade, edita o elimina productos del menú.</CardDescription></div>
                     <div className="flex gap-2">
-                      <AlertDialog><AlertDialogTrigger asChild><Button variant="outline" disabled={isAnyActionInProgress}><UploadCloud />Importar Menú</Button></AlertDialogTrigger>
-                        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Confirmar Importación?</AlertDialogTitle><AlertDialogDescription>Añadirá productos iniciales. No borrará existentes.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isImporting}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleImportInitialMenu} disabled={isImporting}>{isImporting && <Loader2 className="animate-spin"/>}Confirmar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                      <AlertDialog><AlertDialogTrigger asChild><Button variant="outline" disabled={isAnyActionInProgress}><UploadCloud className="mr-2"/>Sincr. Menú</Button></AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Confirmar Sincronización de Menú?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              <p className="mb-2">Esta acción comparará los productos del archivo de datos inicial (`src/data/products.ts`) con los productos existentes en Firestore.</p>
+                              <ul className="list-disc list-inside text-sm space-y-1">
+                                <li><Info className="inline h-4 w-4 mr-1 text-blue-500"/>Los productos nuevos del archivo se añadirán a Firestore.</li>
+                                <li><Info className="inline h-4 w-4 mr-1 text-orange-500"/>Los productos existentes en Firestore que también estén en el archivo se actualizarán (incluyendo alérgenos).</li>
+                                <li><Info className="inline h-4 w-4 mr-1 text-green-500"/>Las imágenes ya subidas a Firebase Storage se protegerán y no se sobrescribirán con placeholders del archivo.</li>
+                                <li><Info className="inline h-4 w-4 mr-1 text-red-500"/>Esta acción no elimina productos de Firestore que no estén en el archivo.</li>
+                              </ul>
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isSyncingMenu}>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleSyncMenuFromFile} disabled={isSyncingMenu}>
+                              {isSyncingMenu && <Loader2 className="animate-spin mr-2"/>}
+                              {isSyncingMenu ? 'Sincronizando...' : 'Confirmar Sincronización'}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
                       </AlertDialog>
                       <Button onClick={handleOpenAddModal} disabled={isAnyActionInProgress}><PackagePlus />Añadir Producto</Button>
                     </div>
@@ -567,7 +641,7 @@ export default function AdminPage() {
                 <CardContent className="pt-6">
                   {isLoadingProducts ? (<div className="flex justify-center py-10"><Loader2 className="animate-spin mr-2" />Cargando...</div>)
                   : productError ? (<Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{productError}</AlertDescription></Alert>)
-                  : products.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Productos</AlertTitle><AlertDescription>Usa "Importar Menú" o "Añadir Producto".</AlertDescription></Alert>)
+                  : products.length === 0 ? (<Alert><AlertCircle /><AlertTitle>No Hay Productos</AlertTitle><AlertDescription>Usa "Sincronizar Menú" o "Añadir Producto".</AlertDescription></Alert>)
                   : (<div className="overflow-x-auto"><Table><TableCaption>Productos en Firestore.</TableCaption><TableHeader><TableRow><TableHead>Imagen</TableHead><TableHead>Nombre</TableHead><TableHead className="hidden md:table-cell">Categoría</TableHead><TableHead className="hidden lg:table-cell max-w-[300px] truncate">Descripción</TableHead><TableHead className="text-right">Precio</TableHead><TableHead className="text-center">Acciones</TableHead></TableRow></TableHeader>
                       <TableBody>{products.map((p) => (<TableRow key={p.id}><TableCell><Image src={p.imageUrl || DEFAULT_PLACEHOLDER_IMAGE} alt={p.name} width={48} height={48} className="rounded object-cover" data-ai-hint={p.dataAiHint}/></TableCell><TableCell className="font-medium">{p.name}</TableCell><TableCell className="hidden md:table-cell"><Badge variant="secondary">{p.category}</Badge></TableCell><TableCell className="hidden lg:table-cell text-xs max-w-[300px] truncate" title={p.description}>{p.description}</TableCell><TableCell className="text-right">€{p.price.toFixed(2)}</TableCell><TableCell className="text-center"><div className="flex justify-center gap-1 sm:gap-2"><Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenEditModal(p)} disabled={isAnyActionInProgress}><Edit /></Button><Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleOpenDeleteAlert(p)} disabled={isAnyActionInProgress}><Trash2 /></Button></div></TableCell></TableRow>))}</TableBody>
                     </Table></div>)}
@@ -599,3 +673,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
