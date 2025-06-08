@@ -56,3 +56,4 @@ La lógica de verificación `totalItems === 0` se movió más arriba en el compo
 
 ---
 <!-- Añadir nuevos bugs aquí -->
+prod build bugs
