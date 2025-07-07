@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if the requesting user is an admin.
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // USERS COLLECTION
+    // Users can read their own profile, and admins can read any profile.
+    // A user can create their own profile document (e.g., on signup).
+    // A user can update their own profile, and an admin can update any user's profile (e.g., to change a role).
+    // Deletes from the client are disallowed for safety.
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId || isAdmin();
+      allow create: if request.auth.uid == userId;
+      allow update: if request.auth.uid == userId || isAdmin();
+      allow delete: if false;
+    }
+
+    // PRODUCTS COLLECTION
+    // Anyone (authenticated or not) can read the product list.
+    // Only admins are allowed to create, update, or delete products.
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ORDERS COLLECTION
+    // A user can read their own orders, and admins can read all orders.
+    // An authenticated user can create an order for themselves.
+    // Only admins can update an order's status.
+    // Deletes from the client are disallowed.
+    match /orders/{orderId} {
+      allow read: if request.auth.uid == resource.data.userId || isAdmin();
+      allow create: if request.auth.uid != null && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+  }
+}

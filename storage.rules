@@ -1,0 +1,20 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper function to check if the requesting user is an admin by reading their profile from Firestore.
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // PRODUCT IMAGES
+    // The path matches how images are stored from the Admin Panel: products/{productId}/{fileName}
+    // Anyone can read product images to display them in the app.
+    // Only authenticated admins are allowed to write (upload, update, delete) product images.
+    match /products/{productId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
+    }
+  }
+}
